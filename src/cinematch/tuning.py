@@ -27,6 +27,16 @@ from .split import filter_test_to_known_users, global_temporal_split, leave_one_
 
 DEFAULT_GRID = (0.0, 0.05, 0.1, 0.2, 0.3, 0.5)
 
+# Grids searched by run_eval --tune-models (documented in the README). The iALS alpha range was
+# widened below the original default (20) after a validation-only pilot showed validation NDCG
+# falling monotonically from alpha=2 to alpha=80 with the best tested value on the lower edge.
+IALS_GRID = {
+    "factors": [32, 64, 128],
+    "regularization": [0.1, 1.0, 10.0],
+    "alpha": [0.25, 0.5, 1.0, 2.0, 5.0],
+}
+KNN_GRID = {"k": [50, 100, 200, 400], "shrink": [0.0, 10.0, 50.0, 200.0]}
+
 
 @dataclass
 class TuningResult:

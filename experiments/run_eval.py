@@ -29,7 +29,7 @@ from cinematch.recommenders import (
 )
 from cinematch.loading import SOURCES, load_dataset
 from cinematch.split import filter_test_to_known_users, global_temporal_split, leave_one_out_split
-from cinematch.tuning import DEFAULT_GRID, tune_content_weight
+from cinematch.tuning import DEFAULT_GRID, IALS_GRID, KNN_GRID, tune_content_weight, tune_model
 
 
 def main() -> None:
@@ -43,6 +43,9 @@ def main() -> None:
     ap.add_argument("--out", default="artifacts")
     ap.add_argument("--tune-hybrid", action="store_true",
                     help="tune the content/iALS fusion weight on a validation split carved from train")
+    ap.add_argument("--tune-models", action="store_true",
+                    help="grid-search iALS and item-kNN hyperparameters on the same validation split; "
+                         "tuned models are added as extra rows and the hybrid weight (if tuned) uses tuned iALS")
     args = ap.parse_args()
 
     ds = load_dataset(args.source, args.data)
@@ -58,28 +61,52 @@ def main() -> None:
 
     content = ContentRecommender()
     knn = ItemKNNRecommender(k=200, shrink=10.0)
-    def make_ials() -> IALSRecommender:
-        return IALSRecommender(factors=64, regularization=0.05, alpha=20.0, iterations=15)
+
+    def make_ials(**overrides) -> IALSRecommender:
+        params = dict(factors=64, regularization=0.05, alpha=20.0, iterations=15)
+        return IALSRecommender(**{**params, **overrides})
 
     ials = make_ials()
-
     untuned = HybridRecommender({"content": (content, 0.3), "ials": (ials, 0.7)}, cold_threshold=3)
     untuned.name = "hybrid_0.3"
     models = [PopularityRecommender(), content, knn, ials, untuned]
+    tuning = {}
 
-    tuning_result = None
+    # Everything below is chosen on a validation split carved from `train`; `test` is never passed in.
+    tuned_ials_params: dict = {}
+    if args.tune_models:
+        for label, factory, grid in (
+            ("item_knn", lambda **p: ItemKNNRecommender(**p), KNN_GRID),
+            ("ials", make_ials, IALS_GRID),
+        ):
+            res = tune_model(ds, train, args.split, make_model=factory, grid=grid, k=args.k, min_train=args.min_train)
+            tuning[label] = {"best_params": res.best_params, "best_val_ndcg": res.best_ndcg,
+                             "edge_params": res.edge_params, "grid": res.grid,
+                             "n_validation_users": res.n_validation_users, "trials": res.trials}
+            print(f"tuned {label} on validation ({res.n_validation_users} users): {res.best_params} "
+                  f"val_ndcg={res.best_ndcg:.4f} edge_of_grid={res.edge_params or 'no'}", flush=True)
+        knn_t = ItemKNNRecommender(**tuning["item_knn"]["best_params"])
+        knn_t.name = "item_knn_tuned"
+        tuned_ials_params = tuning["ials"]["best_params"]
+        ials_t = make_ials(**tuned_ials_params)
+        ials_t.name = "ials_tuned"
+        models += [knn_t, ials_t]
+
     if args.tune_hybrid:
-        # Tuned on a validation split carved from `train`; `test` is not passed in.
-        tuning_result = tune_content_weight(
+        # the fusion partner is the tuned iALS when it was tuned: that is the model worth fusing with
+        res = tune_content_weight(
             ds, train, args.split, grid=DEFAULT_GRID, k=args.k, min_train=args.min_train,
-            make_content=ContentRecommender, make_ials=make_ials,
+            make_content=ContentRecommender, make_ials=lambda: make_ials(**tuned_ials_params),
         )
-        w = tuning_result.best_weight
-        print(f"tuned on validation ({tuning_result.n_validation_users} users): "
-              f"content weight {w} (val ndcg {tuning_result.best_ndcg:.4f})")
-        for c in tuning_result.curve:
+        w = res.best_weight
+        tuning["hybrid"] = {"best_content_weight": w, "n_validation_users": res.n_validation_users,
+                            "validation_curve": res.curve, "ials_params": tuned_ials_params or "default"}
+        print(f"tuned hybrid on validation ({res.n_validation_users} users): content weight {w} "
+              f"(val ndcg {res.best_ndcg:.4f})", flush=True)
+        for c in res.curve:
             print(f"    w={c['content_weight']:<5} val_ndcg={c['ndcg']:.4f} val_recall={c['recall']:.4f}")
-        tuned = HybridRecommender({"content": (content, w), "ials": (ials, 1.0 - w)}, cold_threshold=3)
+        partner = ials_t if args.tune_models else ials
+        tuned = HybridRecommender({"content": (content, w), "ials": (partner, 1.0 - w)}, cold_threshold=3)
         tuned.name = f"hybrid_tuned_{w:g}"
         models.append(tuned)
 
@@ -103,12 +130,8 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / f"results_{args.split}_k{args.k}.csv", index=False)
     payload = {"rows": rows}
-    if tuning_result is not None:
-        payload["hybrid_tuning"] = {
-            "best_content_weight": tuning_result.best_weight,
-            "n_validation_users": tuning_result.n_validation_users,
-            "validation_curve": tuning_result.curve,
-        }
+    if tuning:
+        payload["tuning"] = tuning
     (out / f"results_{args.split}_k{args.k}.json").write_text(json.dumps(payload, indent=2))
 
     print("\n" + df[["model", "recall", "precision", "ndcg", "map", "coverage", "diversity",
