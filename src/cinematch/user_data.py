@@ -146,6 +146,26 @@ def list_watchlist(user: User = Depends(current_user), session: Session = Depend
     return [WatchlistEntry(movie_id=r.movie_id, title=r.title, added_at=_utc(r.added_at)) for r in rows]
 
 
+def load_user_items(session: Session, user: User, n_items: int):
+    """(rows, seen item_idx, positive item_idx) for one user, restricted to films the model knows.
+
+    The single definition of "positive": a rating >= POSITIVE_THRESHOLD, the same rule training
+    uses. Every interaction of ANY type or rating marks a film as seen. Films added to the catalogue
+    after the model was trained (item_idx >= n_items) have no factors and are ignored.
+    """
+    rows = session.execute(
+        select(Movie.item_idx, Interaction.type, Interaction.rating, Interaction.created_at)
+        .join(Movie, Movie.movie_id == Interaction.movie_id)
+        .where(Interaction.user_id == user.id)
+    ).all()
+    known = [r for r in rows if r.item_idx < n_items]
+    seen = np.array(sorted({r.item_idx for r in known}), dtype=np.int64)
+    positives = np.array(
+        sorted({r.item_idx for r in known if r.type == "rating" and r.rating >= POSITIVE_THRESHOLD}), dtype=np.int64
+    )
+    return rows, seen, positives
+
+
 @router.get("/me/recommendations", response_model=Recommendations)
 def my_recommendations(
     k: int = Query(10, ge=1, le=100),
@@ -164,16 +184,7 @@ def my_recommendations(
         raise HTTPException(503, "model artifact not loaded; run scripts/train.py")
     t0 = time.perf_counter()
 
-    rows = session.execute(
-        select(Movie.item_idx, Interaction.type, Interaction.rating, Interaction.created_at)
-        .join(Movie, Movie.movie_id == Interaction.movie_id)
-        .where(Interaction.user_id == user.id)
-    ).all()
-    known = [r for r in rows if r.item_idx < ds.n_items]
-    seen = np.array(sorted({r.item_idx for r in known}), dtype=np.int64)
-    positives = np.array(
-        sorted({r.item_idx for r in known if r.type == "rating" and r.rating >= POSITIVE_THRESHOLD}), dtype=np.int64
-    )
+    rows, seen, positives = load_user_items(session, user, ds.n_items)
 
     # Version stamp for the cached latent vector. The interaction COUNT alone is not enough:
     # re-rating a film from 5 stars to 1 leaves the count unchanged but removes a positive, and the

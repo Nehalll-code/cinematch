@@ -29,6 +29,8 @@ import numpy as np
 from fastapi import FastAPI, HTTPException, Query
 
 from .accounts import router as accounts_router
+from .catalog import router as catalog_router
+from .posters import PosterService
 from .schemas import Movie, Recommendations, movie_from
 from .user_data import router as user_data_router
 from .state import STATE
@@ -64,7 +66,10 @@ async def lifespan(app: FastAPI):
             engine.dispose()
             STATE.clear()
             raise
+    STATE["posters"] = PosterService.from_env()  # None unless TMDB_API_KEY is set
     yield
+    if STATE.get("posters") is not None:
+        STATE["posters"].client.close()
     if "engine" in STATE:
         STATE["engine"].dispose()
     STATE.clear()
@@ -72,6 +77,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="CineMatch", version="0.1.0", lifespan=lifespan)
 app.include_router(accounts_router)
+app.include_router(catalog_router)
 app.include_router(user_data_router)
 
 
