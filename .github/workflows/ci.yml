@@ -1,0 +1,13 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+      - run: python scripts/make_synthetic.py --users 200 --items 600 --interactions 12000 --out data_synthetic
+      - run: python -m pytest tests/ -q
+      - run: python experiments/run_eval.py --data data_synthetic --split temporal --k 10 --out artifacts_ci
