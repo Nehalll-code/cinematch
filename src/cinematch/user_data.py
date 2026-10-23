@@ -3,20 +3,29 @@
 These rows are STORED, not learned from: nothing here reaches the trained model, and there is no
 scheduled retraining. They exist so a future retrain has data, and so the schema is exercised.
 The caller's identity always comes from the token, never from the request body.
+
+/me/recommendations is the exception to "stored, not learned from": it personalises a registered
+user by FOLD-IN (cinematch.recommenders.ials.IALSRecommender.fold_in), one least-squares solve
+against the fixed item factors. The item factors themselves never learn from these users.
 """
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+import numpy as np
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .accounts import current_user, get_session
 from .db.dialect import insert_for
+from .data import POSITIVE_THRESHOLD
 from .db.models import Interaction, Movie, User, WatchlistItem
+from .schemas import Recommendations, movie_from
+from .state import STATE
 
 router = APIRouter()
 
@@ -135,3 +144,54 @@ def list_watchlist(user: User = Depends(current_user), session: Session = Depend
         .order_by(WatchlistItem.added_at.desc(), WatchlistItem.movie_id)
     ).all()
     return [WatchlistEntry(movie_id=r.movie_id, title=r.title, added_at=_utc(r.added_at)) for r in rows]
+
+
+@router.get("/me/recommendations", response_model=Recommendations)
+def my_recommendations(
+    k: int = Query(10, ge=1, le=100),
+    user: User = Depends(current_user), session: Session = Depends(get_session),
+) -> Recommendations:
+    """Personalised top-k for the signed-in user, from their own interactions.
+
+    Positives are ratings >= 4.0 (the same rule as training); every interaction of any type or
+    rating marks a film as seen and hides it. Below the model's cold threshold of positives the
+    user gets popularity, flagged cold_start. Films added to the catalogue after the model was
+    trained have no factors and are ignored. `cached` is always False here: there is no result
+    cache for this endpoint, only the fold-in vector cache inside the model.
+    """
+    model, ds = STATE.get("model"), STATE.get("dataset")
+    if model is None:
+        raise HTTPException(503, "model artifact not loaded; run scripts/train.py")
+    t0 = time.perf_counter()
+
+    rows = session.execute(
+        select(Movie.item_idx, Interaction.type, Interaction.rating, Interaction.created_at)
+        .join(Movie, Movie.movie_id == Interaction.movie_id)
+        .where(Interaction.user_id == user.id)
+    ).all()
+    known = [r for r in rows if r.item_idx < ds.n_items]
+    seen = np.array(sorted({r.item_idx for r in known}), dtype=np.int64)
+    positives = np.array(
+        sorted({r.item_idx for r in known if r.type == "rating" and r.rating >= POSITIVE_THRESHOLD}), dtype=np.int64
+    )
+
+    # Version stamp for the cached latent vector. The interaction COUNT alone is not enough:
+    # re-rating a film from 5 stars to 1 leaves the count unchanged but removes a positive, and the
+    # stale vector would keep recommending as if it were still liked. Every write also moves
+    # created_at (upserts overwrite it), so (count, newest timestamp) changes on any write.
+    newest = max((r.created_at for r in rows), default=None)
+    stamp = (len(rows), newest.isoformat() if newest is not None else None)
+
+    scores = model.score_from_items(positives, cache_key=(user.id, stamp)).astype(np.float32, copy=True)
+    scores[seen] = -np.inf
+    kk = min(k, len(scores))
+    top = np.argpartition(-scores, kk - 1)[:kk]
+    top = top[np.argsort(-scores[top])]
+
+    return Recommendations(
+        user_id=user.id,
+        cold_start=bool(len(positives) < model.cold_threshold),
+        latency_ms=round((time.perf_counter() - t0) * 1000, 3),
+        cached=False,
+        items=[movie_from(ds, int(i), float(scores[i])) for i in top],
+    )

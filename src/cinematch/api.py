@@ -27,28 +27,13 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
 
 from .accounts import router as accounts_router
+from .schemas import Movie, Recommendations, movie_from
 from .user_data import router as user_data_router
 from .state import STATE
 
 LATENCIES: list[float] = []
-
-
-class Movie(BaseModel):
-    movie_id: int
-    title: str
-    genres: list[str]
-    score: float
-
-
-class Recommendations(BaseModel):
-    user_id: int
-    cold_start: bool
-    latency_ms: float
-    cached: bool
-    items: list[Movie]
 
 
 @asynccontextmanager
@@ -154,7 +139,7 @@ def recommend(user_id: int, k: int = Query(10, ge=1, le=100)) -> Recommendations
         cold_start=bool(model.user_counts_[user_idx] < model.cold_threshold),
         latency_ms=round(elapsed, 3),
         cached=cached,
-        items=[_movie(ds, i, score) for i, score in ranked],
+        items=[movie_from(ds, i, score) for i, score in ranked],
     )
 
 
@@ -171,14 +156,4 @@ def similar(movie_id: int, k: int = Query(10, ge=1, le=100)) -> list[Movie]:
     sims[idx] = -np.inf
     top = np.argpartition(-sims, k)[:k]
     top = top[np.argsort(-sims[top])]
-    return [_movie(ds, int(i), float(sims[i])) for i in top]
-
-
-def _movie(ds, item_idx: int, score: float) -> Movie:
-    row = ds.items.iloc[item_idx]
-    return Movie(
-        movie_id=int(row["movieId"]),
-        title=str(row["title"]),
-        genres=[g for g in str(row["genres"]).split("|") if g and g != "(no genres listed)"],
-        score=round(score, 5),
-    )
+    return [movie_from(ds, int(i), float(sims[i])) for i in top]
