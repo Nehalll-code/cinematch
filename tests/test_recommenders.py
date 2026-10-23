@@ -88,3 +88,12 @@ def test_hybrid_weights_shift_output_toward_the_heavier_component(dataset, split
     pure_ials = rank_normalize(ials.score_users(users))
     blended = mostly_content.score_users(users)
     assert np.abs(blended - pure_content).mean() < np.abs(blended - pure_ials).mean()
+
+
+def test_content_model_actually_uses_the_release_year(dataset, split):
+    # content.py documents the year as a signal; the tokenizer used to drop every digit, so the
+    # comment described a feature that did not exist
+    train, _ = split
+    model = ContentRecommender().fit(dataset, train)
+    years = {t.rsplit("(", 1)[1].rstrip(")") for t in dataset.items["title"]}
+    assert years <= set(model.vectorizer_.vocabulary_), "release years missing from the vocabulary"

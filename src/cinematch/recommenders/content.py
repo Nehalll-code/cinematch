@@ -18,6 +18,10 @@ from ..data import Dataset
 from .base import Recommender
 
 
+# words (letters, hyphens, apostrophes) or any run of digits
+TOKEN_PATTERN = r"[A-Za-z][A-Za-z\-']+|\d+"
+
+
 class ContentRecommender(Recommender):
     name = "content"
 
@@ -27,8 +31,11 @@ class ContentRecommender(Recommender):
 
     @staticmethod
     def _documents(items: pd.DataFrame) -> list[str]:
-        # Genres are pipe-delimited in MovieLens; the year in the title is
-        # signal (era clusters taste) so the title is kept whole.
+        # Genres are pipe-delimited in MovieLens. The release year is in the title ("Heat (1995)")
+        # and era plausibly clusters taste, so the whole title is kept and TOKEN_PATTERN admits
+        # digits. (It used to be letters-only, which silently dropped the year while this comment
+        # claimed otherwise.) Each exact year is its own token, so years are matched exactly, not
+        # bucketed into decades.
         genres = items["genres"].fillna("").str.replace("|", " ", regex=False)
         titles = items["title"].fillna("")
         return (genres + " " + genres + " " + titles).tolist()  # genres weighted x2
@@ -36,7 +43,7 @@ class ContentRecommender(Recommender):
     def fit(self, dataset: Dataset, train: pd.DataFrame) -> "ContentRecommender":
         self.dataset = dataset
         self.train_matrix = dataset.matrix(train)
-        vec = TfidfVectorizer(max_features=self.max_features, token_pattern=r"[A-Za-z][A-Za-z\-']+")
+        vec = TfidfVectorizer(max_features=self.max_features, token_pattern=TOKEN_PATTERN)
         self.item_features_ = normalize(vec.fit_transform(self._documents(dataset.items)))
         self.vectorizer_ = vec
         # profile = normalised mean of liked item vectors
