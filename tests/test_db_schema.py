@@ -63,11 +63,16 @@ def seeded(db):
 
 
 class TestInteractions:
-    def test_valid_rating_and_watch(self, seeded):
+    def test_valid_rating_watch_and_dismiss(self, seeded):
         db, uid = seeded
         db.add(Interaction(user_id=uid, movie_id=10, type="rating", rating=4.5))
         db.add(Interaction(user_id=uid, movie_id=10, type="watch"))
+        db.add(Interaction(user_id=uid, movie_id=10, type="dismiss"))
         db.flush()
+
+    def test_dismiss_carries_no_rating(self, seeded):
+        db, uid = seeded
+        _fails(db, Interaction(user_id=uid, movie_id=10, type="dismiss", rating=3.0))
 
     @pytest.mark.parametrize("kwargs", [
         dict(type="like"),                       # unknown type

@@ -37,7 +37,7 @@ class InteractionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     movie_id: int
-    type: Literal["rating", "watch"]
+    type: Literal["rating", "watch", "dismiss"]
     rating: float | None = None
 
     @model_validator(mode="after")

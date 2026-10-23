@@ -50,7 +50,7 @@ NAMING_CONVENTION = {
 # SQLite only autoincrements a column declared exactly INTEGER PRIMARY KEY; Postgres wants BIGINT.
 BigIntPK = BigInteger().with_variant(Integer, "sqlite")
 
-INTERACTION_TYPES = ("rating", "watch")
+INTERACTION_TYPES = ("rating", "watch", "dismiss")
 
 
 class Base(DeclarativeBase):
@@ -109,7 +109,7 @@ class Movie(Base):
 class Interaction(Base):
     __tablename__ = "interactions"
     __table_args__ = (
-        CheckConstraint("type IN ('rating', 'watch')", name="type_known"),
+        CheckConstraint("type IN ('rating', 'watch', 'dismiss')", name="type_known"),
         CheckConstraint(
             "(type = 'rating' AND rating IS NOT NULL AND rating >= 0.5 AND rating <= 5.0)"
             " OR (type <> 'rating' AND rating IS NULL)",

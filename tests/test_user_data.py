@@ -61,6 +61,11 @@ class TestInteractions:
         rows = db.scalars(select(Interaction)).all()
         assert len(rows) == 1 and rows[0].rating == 5.0
 
+    def test_dismiss_is_accepted_without_a_rating_and_rejects_one(self, client, db, ada):
+        assert client.post("/interactions", headers=ada, json={"movie_id": 10, "type": "dismiss"}).status_code == 201
+        assert client.post("/interactions", headers=ada, json={"movie_id": 10, "type": "dismiss", "rating": 2.0}).status_code == 422
+        assert [r.type for r in db.scalars(select(Interaction)).all()] == ["dismiss"]
+
     def test_watch_has_no_rating(self, client, ada):
         assert client.post("/interactions", headers=ada, json={"movie_id": 10, "type": "watch"}).status_code == 201
 
