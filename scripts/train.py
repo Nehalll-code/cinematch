@@ -23,9 +23,10 @@ def main() -> None:
     ap.add_argument("--data", default="data/ml-1m", help="csv source only")
     ap.add_argument("--out", default="artifacts/model.pkl")
     ap.add_argument("--factors", type=int, default=64)
-    # 0.0 is the weight chosen on a validation split carved from train (run_eval.py
-    # --tune-hybrid) on both ml-1m splits; see README. The content model stays in the hybrid
-    # because /similar reads its item features, but it contributes nothing to the blend.
+    # 0.0 is the optimum on the headline (temporal) validation split carved from train
+    # (run_eval.py --tune-hybrid); the LOO validation optimum is 0.05, within noise of 0. See README.
+    # The content model stays in the hybrid because /similar reads its item features, but at 0.0
+    # it contributes nothing to the blend.
     ap.add_argument("--content-weight", type=float, default=0.0)
     args = ap.parse_args()
 

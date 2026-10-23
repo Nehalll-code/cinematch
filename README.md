@@ -16,44 +16,51 @@ make eval          # trains all five models, prints the comparison table
 make train && make bench && make api
 ```
 
+Accounts, interactions and the watchlist need PostgreSQL (`make db-up`); see "Persistence and
+accounts". The evaluation and the recommendation API do not.
+
 No network? `make synth` generates a dataset with the same schema, and everything
 (`make test`, `python experiments/run_eval.py --data data_synthetic`) runs offline.
 `make data-small && make smoke` runs the same pipeline on ml-latest-small in about a minute.
 
 ## Results
 
-MovieLens **ml-1m** (1,000,209 ratings; 575,281 positives at rating ≥ 4.0; 6,038 users with at
-least one positive; 3,533 items with at least one positive), k=10, full-catalogue ranking.
-`ml-latest-small` is kept as the fast smoke dataset (`make data-small && make smoke`) but is not
-used for headline numbers: its temporal split leaves only 26 evaluable users.
+MovieLens **ml-1m** (1,000,209 ratings; 575,281 positives at rating ≥ 4.0), k=10, full-catalogue
+ranking over all **3,883 movies and 6,040 users** (the full catalogue, not just items that happen
+to have a positive rating; see "One index space" below). These numbers were produced by
+`python experiments/run_eval.py --source db` reading from PostgreSQL; `--source csv` gives
+identical numbers, which a test enforces. `ml-latest-small` is kept as the fast smoke dataset
+(`make data-small && make smoke`) but is not used for headline numbers: its temporal split leaves
+only 26 evaluable users.
 
 iALS and item-kNN hyperparameters are untuned defaults. The one thing that *was* tuned is the
 hybrid's fusion weight, on a validation split carved out of train (next section).
 
 **Global temporal split, 80/20 — 1,082 evaluable users** (the headline split; cut at 2000-12-01):
 
-| model            | recall | precision |   ndcg |    map | coverage | diversity | novelty |
-|------------------|-------:|----------:|-------:|-------:|---------:|----------:|--------:|
-| popularity       | 0.0446 |    0.1761 | 0.1892 | 0.1134 |   0.0258 |    0.7179 |    8.06 |
-| content          | 0.0072 |    0.0328 | 0.0332 | 0.0129 |   0.1407 |    0.3847 |   12.64 |
-| item_knn         | 0.0517 |    0.1937 | 0.2103 | 0.1279 |   0.0464 |    0.7500 |    8.37 |
-| ials             | 0.0409 |    0.1388 | 0.1474 | 0.0756 |   0.3207 |    0.7008 |    9.66 |
-| hybrid (w=0.3)   | 0.0338 |    0.1137 | 0.1205 | 0.0589 |   0.2423 |    0.4982 |    9.86 |
-| hybrid (tuned)   | 0.0409 |    0.1388 | 0.1474 | 0.0756 |   0.3207 |    0.7008 |    9.66 |
+| model                | recall | precision |   ndcg |    map | coverage | diversity | novelty |
+|----------------------|-------:|----------:|-------:|-------:|---------:|----------:|--------:|
+| popularity           | 0.0446 |    0.1761 | 0.1892 | 0.1134 |   0.0234 |    0.7187 |    8.06 |
+| content              | 0.0070 |    0.0312 | 0.0319 | 0.0126 |   0.1257 |    0.3767 |   13.53 |
+| item_knn             | 0.0517 |    0.1936 | 0.2103 | 0.1278 |   0.0422 |    0.7507 |    8.37 |
+| ials                 | 0.0406 |    0.1368 | 0.1437 | 0.0743 |   0.2954 |    0.7050 |    9.68 |
+| hybrid (w=0.3)       | 0.0316 |    0.1101 | 0.1193 | 0.0588 |   0.2163 |    0.4960 |    9.87 |
+| hybrid (tuned, w=0)  | 0.0406 |    0.1368 | 0.1437 | 0.0743 |   0.2954 |    0.7050 |    9.68 |
 
 **Leave-one-out split — 6,028 evaluable users** (for comparability with published numbers):
 
-| model            | recall | precision |   ndcg |    map | coverage | diversity | novelty |
-|------------------|-------:|----------:|-------:|-------:|---------:|----------:|--------:|
-| popularity       | 0.0406 |    0.0041 | 0.0194 | 0.0131 |   0.0326 |    0.7194 |    8.08 |
-| content          | 0.0206 |    0.0021 | 0.0098 | 0.0066 |   0.2358 |    0.3563 |   12.55 |
-| item_knn         | 0.0604 |    0.0060 | 0.0306 | 0.0217 |   0.0866 |    0.7360 |    8.42 |
-| ials             | 0.0868 |    0.0087 | 0.0436 | 0.0306 |   0.4331 |    0.6643 |    9.63 |
-| hybrid (w=0.3)   | 0.0718 |    0.0072 | 0.0356 | 0.0247 |   0.3487 |    0.4672 |    9.86 |
-| hybrid (tuned)   | 0.0868 |    0.0087 | 0.0436 | 0.0306 |   0.4331 |    0.6643 |    9.63 |
+| model                 | recall | precision |   ndcg |    map | coverage | diversity | novelty |
+|-----------------------|-------:|----------:|-------:|-------:|---------:|----------:|--------:|
+| popularity            | 0.0405 |    0.0040 | 0.0193 | 0.0131 |   0.0296 |    0.7205 |    8.08 |
+| content               | 0.0196 |    0.0020 | 0.0093 | 0.0062 |   0.2161 |    0.3498 |   13.43 |
+| item_knn              | 0.0604 |    0.0060 | 0.0306 | 0.0217 |   0.0788 |    0.7367 |    8.42 |
+| ials                  | 0.0854 |    0.0085 | 0.0430 | 0.0303 |   0.3961 |    0.6662 |    9.63 |
+| hybrid (w=0.3)        | 0.0733 |    0.0073 | 0.0366 | 0.0256 |   0.3155 |    0.4656 |    9.87 |
+| hybrid (tuned, w=0.05)| 0.0818 |    0.0082 | 0.0405 | 0.0281 |   0.3680 |    0.5716 |    9.67 |
 
 `w` is the content model's weight in the rank-normalised blend `w·content + (1−w)·iALS`.
-"Tuned" rows use w = 0 (below), which makes the hybrid identical to iALS.
+"Tuned" rows use the weight chosen on validation (next section); at w = 0 the hybrid is
+identical to iALS.
 
 **Read these with three caveats.**
 
@@ -65,11 +72,11 @@ hybrid's fusion weight, on a validation split carved out of train (next section)
    cut while untuned iALS fits per-user taste that drifts. Tuning iALS on a validation split
    would be the way to find out.
 2. *Temporal evaluates a minority of users.* ml-1m covers 2000-04 to 2003-02 but most ratings
-   land in 2000. Only 1,785 of 6,038 users have any rating after the cutoff, and 1,082 of those
+   land in 2000. Only 1,785 of 6,040 users have any rating after the cutoff, and 1,082 of those
    have ≥ 5 training interactions. The headline is a statement about users active late, not all
    users.
-3. *Coverage is over the full 3,533-item catalogue*, not over items that happen to appear in
-   test. iALS reaches 43% under LOO while item_kNN reaches 8.7%.
+3. *Coverage is over the full 3,883-movie catalogue.* iALS reaches 40% under LOO while item_kNN
+   reaches 7.9%; that is a more honest denominator than "items that happen to appear in test".
 
 ### Hybrid fusion weight
 
@@ -81,17 +88,24 @@ way in. Validation NDCG@10 by content weight:
 
 | content weight | 0.0 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 |
 |---|---:|---:|---:|---:|---:|---:|
-| temporal (297 validation users) | **0.1277** | 0.1163 | 0.1122 | 0.1051 | 0.0981 | 0.0922 |
-| LOO (6,016 validation users) | **0.0438** | 0.0430 | 0.0412 | 0.0399 | 0.0381 | 0.0340 |
+| temporal (297 validation users) | **0.1288** | 0.1151 | 0.1131 | 0.1054 | 0.1018 | 0.0909 |
+| LOO (6,016 validation users) | 0.0433 | **0.0438** | 0.0431 | 0.0397 | 0.0376 | 0.0337 |
 
-The optimum is **zero on both splits** and the curve falls monotonically as content weight
-rises. That is the finding: **a genre-and-title content signal is too weak to contribute to the
-blend on this dataset.** Content alone scores NDCG 0.0332 (temporal) and 0.0098 (LOO) against
-iALS's 0.1474 and 0.0436, and mixing a ranker that weak into a stronger one only dilutes it.
-The hybrid is not deleted: it still carries the cold-start popularity fallback and the content
+The optimum is **at or next to zero on both splits**, and beyond 0.1 the curve falls steadily.
+That is the finding: **a genre-and-title content signal is too weak to contribute to the blend on
+this dataset.** Content alone scores NDCG 0.0319 (temporal) and 0.0093 (LOO) against iALS's
+0.1437 and 0.0430, and mixing a ranker that weak into a stronger one only dilutes it.
+
+Two things not to over-read. On LOO the validation winner is w = 0.05, but it beats w = 0 by
+0.0005 NDCG (about 1%), which is indistinguishable from noise; and on the held-out test split
+that 0.05 hybrid scored 0.0405, *below* iALS alone at 0.0430. The small validation gain did not
+generalise. The weight was not revisited after seeing test (that would be tuning on test).
+
+The hybrid is not deleted: it carries the cold-start popularity fallback and the content
 component that `/similar` reads. The served model uses w = 0 (`scripts/train.py
---content-weight`). Reproduce with `python experiments/run_eval.py --data data/ml-1m --split
-temporal --tune-hybrid`.
+--content-weight`), my call: it is the optimum on the headline (temporal) validation split, and
+the LOO difference is within noise. Reproduce with `python experiments/run_eval.py --source db
+--split temporal --tune-hybrid`.
 
 ### Why content-based underperforms here
 
@@ -114,17 +128,105 @@ Neither is done here; the content model is reported as it is.
 ### Serving latency
 
 In-process, **not end-to-end over HTTP**: no network, no ASGI, no JSON serialisation. This is a
-lower bound on deployed latency. 3,533-item catalogue, 6,038 users, k=10, 500 requests, one run
-on one machine.
+lower bound on deployed latency. 3,883-movie catalogue, 6,040 users, k=10, 500 requests, one run
+on one machine, artifact trained from the database.
 
 | path   | p50 | p95 | p99 |
 |--------|----:|----:|----:|
-| cold   | 2.907 ms | 4.183 ms | 5.234 ms |
-| cached | 0.001 ms | 0.001 ms | 0.004 ms |
+| cold   | 2.998 ms | 4.583 ms | 5.610 ms |
+| cached | 0.001 ms | 0.001 ms | 0.003 ms |
 
 The "cached" row times the memoised top-k lookup only. The `/recommend` endpoint also calls
 `score_users` again to attach display scores, so a cache hit does not make a full request
 near-free. Fixing that is future work.
+
+## Persistence and accounts
+
+PostgreSQL + SQLAlchemy 2.0 + Alembic. `make db-up` starts Postgres 16 (Docker Compose, loopback
+only); schema changes are Alembic migrations, and a test fails if the models and migrations
+disagree.
+
+```bash
+make db-up                                  # docker compose up -d --wait
+export DATABASE_URL=postgresql+psycopg://cinematch:cinematch_dev@127.0.0.1:5432/cinematch
+make db-migrate                             # alembic upgrade head
+python scripts/ingest.py --data data/ml-1m  # idempotent; ~5 min for 1M ratings
+python scripts/train.py --source db         # artifact trained from the database
+export CINEMATCH_JWT_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(48))")
+make api
+```
+
+Tables: `users`, `movies`, `interactions (user_id, movie_id, type, rating, created_at)`,
+`watchlist`, and `index_counters`.
+
+### One index space
+
+A trained model addresses movies and users by *position*. If the position of a movie changes, the
+model still scores fine and returns plausible, wrong recommendations; nothing raises. So:
+
+- `movies.item_idx` and `users.user_idx` are **persistent, append-only columns**. Each is
+  allocated once from a counter table and never reused, even if a row is deleted (a
+  `MAX(col)+1` scheme would reuse the highest index, and two concurrent inserts could read the
+  same maximum; the counter's `UPDATE` takes a row lock and rolls back with the transaction).
+- The **CSV loader uses the same mapping**: every movie in `movies.csv` and every rating user,
+  sorted by id. A fresh database import reproduces it exactly; later imports append. There is
+  deliberately one mapping, not a DB one plus a CSV one with a reconciliation test.
+- The trained artifact carries the id vectors it was trained on. At startup the API compares them
+  with the database and **refuses to start on a mismatch** (rows appended since training are
+  fine; any disagreement at a known index, or fewer rows, is fatal). `/health` reports
+  `index_verified`.
+- `users` and `movies` are never hard-deleted by the application; the loader raises if the index
+  columns are not a contiguous `0..n-1`.
+
+### Offline eval still works
+
+`python experiments/run_eval.py` reads CSV by default and needs no database. `--source db` reads
+the same data from Postgres. `tests/test_db_source.py` asserts the two produce identical frames
+(values, dtypes, row order, original MovieLens timestamps), including a tie-heavy dataset: among
+equal timestamps leave-one-out's "last interaction" is decided by row order, and reversing the
+database's row order makes that test fail. `tests/test_run_eval_source.py` runs the real script
+from both sources and requires exactly equal metrics. Interactions keep their original timestamps
+in `created_at`; stamping imports with `now()` would destroy the temporal split.
+
+### Schema choices
+
+- **One `users` table.** The eval needs 6,040 MovieLens users (no email, no password); the
+  product needs accounts. `email` and `password_hash` are nullable, `ml_user_id` is unique, and
+  CHECK constraints enforce: `email IS NOT NULL OR ml_user_id IS NOT NULL`, lowercase email (which
+  makes the unique index case-insensitive without `citext`), and "a password needs an email".
+- **`interactions.type` is `VARCHAR` + `CHECK`, not a Postgres `ENUM`.** Adding a value to a
+  native enum needs `ALTER TYPE` and cannot be rolled back cleanly; a CHECK is an ordinary
+  drop/create. Types are `rating` and `watch`; a rating is required (0.5–5.0) iff the type is
+  `rating`.
+- **One row per `(user, movie, type)`**, so re-rating updates in place (and loses rating
+  history). Its leading `user_id` serves "all of a user's interactions", so there is no separate
+  `user_id` index; `movie_id` has its own for the foreign-key reverse lookup.
+- **`movies.movie_id` is the MovieLens id**, the id the API already exposes; a surrogate would be
+  a second id space. `genres` stays a pipe-delimited string because the content model tokenises
+  exactly that string.
+
+### Accounts and auth
+
+`POST /auth/register`, `POST /auth/login`, `GET /me`, plus authenticated `POST/GET /interactions`
+and `PUT/DELETE/GET /watchlist`. The caller's identity comes only from the token.
+
+- **Passwords: Argon2id via `argon2-cffi`**, used directly (no passlib, which is unmaintained).
+  Salted per hash, parameters embedded, rehashed on login when the cost changes.
+- **Tokens: HS256 JWT, access-only, 60 minutes.** Decoding pins `algorithms=["HS256"]` and
+  requires `exp` and `sub`, which closes `alg: none` and algorithm-confusion forgeries. The secret
+  comes from `CINEMATCH_JWT_SECRET` with no default and a 32-character minimum; the service
+  refuses to start without it when a database is configured.
+- Unknown email, wrong password and an imported (password-less) user all return the same 401,
+  and a dummy hash is verified for unknown emails, so the response does not reveal which emails
+  are registered (timing is comparable, not constant).
+
+**Out of scope, on purpose:** refresh tokens, token revocation/logout and secret rotation (a
+stolen token is valid until it expires; rotating the secret logs everyone out); rate limiting
+and account lockout; email verification and password reset.
+
+These writes are **stored, not learned from**: nothing reaches the trained model and there is no
+scheduled retraining. A user registered after training has no row in the model, and
+`/recommend/{user_id}` still takes MovieLens ids.
 
 ## Design decisions
 
@@ -174,10 +276,14 @@ not get silently credited to the personalised models.
 
 Claiming these would be dishonest, so they are listed as gaps:
 
-- **No PostgreSQL, no Redis.** Artifacts load into process memory; caching is an in-process LRU.
-  A database and an external cache change the operational story, not recommendation quality.
-- **No online feedback loop.** Interactions are batch inputs; there is no write path, no
-  scheduled retraining.
+- **No Redis.** Recommendations are served from an artifact loaded into process memory and
+  memoised in an in-process LRU. PostgreSQL holds accounts, interactions and the watchlist but is
+  not consulted per recommendation.
+- **No online feedback loop.** Interactions can be written (`POST /interactions`) but are stored,
+  not learned from: no scheduled retraining, and users registered after training get no
+  personalised recommendations.
+- **No refresh tokens, revocation, secret rotation, rate limiting, email verification** (see
+  "Accounts and auth").
 - **No LLM query interface.**
 - **No frontend.**
 - **No hyperparameter search beyond the fusion weight.** iALS factors/regularisation/α and
@@ -190,14 +296,21 @@ Claiming these would be dishonest, so they are listed as gaps:
 
 ```
 src/cinematch/
-  data.py              loading, binarization, index mapping
+  data.py              loading, binarization, the full-catalogue index mapping
+  loading.py           csv-or-db Dataset entry point
   split.py             temporal and leave-one-out splits
+  tuning.py            validation-split tuning (never sees test)
   evaluate.py          full-catalogue ranking metrics
-  api.py               FastAPI service, LRU cache, latency percentiles
+  api.py               FastAPI service, LRU cache, latency percentiles, startup index check
+  accounts.py          register / login / me          auth.py   Argon2id + JWT primitives
+  user_data.py         interactions and watchlist endpoints
+  db/                  models, session, index allocator, ingest, db-backed loader, verify
   recommenders/        popularity, content, item_knn, ials, hybrid
-scripts/               download_data, make_synthetic, train
+migrations/            Alembic
+scripts/               download_data, make_synthetic, ingest, train
 experiments/           run_eval, benchmark_api
-tests/                 32 tests incl. oracle, leakage and no-test-in-tuning checks
+tests/                 oracle, leakage, DB equality, index-drift, auth and endpoint tests;
+                       DB tests run on SQLite and on Postgres (make test-pg)
 ```
 
 `make test` runs the suite. It includes an oracle recommender that must score NDCG exactly 1.0
