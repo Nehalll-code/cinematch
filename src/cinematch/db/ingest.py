@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import func, select
+from sqlalchemy import bindparam, func, select, update
 from sqlalchemy.orm import Session
 
 from .dialect import insert_for
@@ -44,6 +44,7 @@ def ingest_movielens(session: Session, data_dir: str | Path) -> IngestStats:
     ratings = ratings[ratings["movieId"].isin(set(movies["movieId"]))]
 
     n_movies = _ingest_movies(session, movies)
+    _ingest_links(session, data_dir, set(movies["movieId"]))
     n_users, user_pk = _ingest_users(session, sorted(ratings["userId"].unique().tolist()))
     n_inter = _ingest_interactions(session, ratings, user_pk)
     session.flush()
@@ -63,6 +64,28 @@ def _ingest_movies(session: Session, movies: pd.DataFrame) -> int:
     ]
     session.execute(insert_for(session, Movie), rows)
     return len(rows)
+
+
+def _ingest_links(session: Session, data_dir: Path, known_movies: set[int]) -> None:
+    """Fill movies.tmdb_id from an optional links.csv (MovieLens: movieId, imdbId, tmdbId).
+
+    Optional because ml-1m does not ship one (see scripts/download_links.py). Safe to re-run, and it
+    also back-fills a catalogue that was ingested before the column existed.
+    """
+    path = data_dir / "links.csv"
+    if not path.exists():
+        return
+    links = pd.read_csv(path)
+    links = links[links["movieId"].isin(known_movies) & links["tmdbId"].notna()]
+    if links.empty:
+        return
+    # Core table, not the ORM entity: with the entity, a list of parameter dicts is interpreted as an
+    # ORM "bulk update by primary key" and rejects the WHERE bindparam.
+    movies = Movie.__table__
+    session.execute(
+        update(movies).where(movies.c.movie_id == bindparam("b_movie_id")).values(tmdb_id=bindparam("b_tmdb_id")),
+        [{"b_movie_id": int(m), "b_tmdb_id": int(t)} for m, t in zip(links["movieId"], links["tmdbId"])],
+    )
 
 
 def _ingest_users(session: Session, ml_ids: list[int]) -> tuple[int, dict[int, int]]:

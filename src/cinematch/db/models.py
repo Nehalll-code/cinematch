@@ -101,6 +101,9 @@ class Movie(Base):
     # Pipe-delimited exactly as MovieLens ships it: the content model tokenises this string, and
     # a normalised genre table would be reassembled into the same string on every training run.
     genres: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    # The Movie Database id from MovieLens' links.csv; NULL when unknown. Not unique: it identifies
+    # an external record, and MovieLens occasionally maps two of its own ids to the same TMDB film.
+    tmdb_id: Mapped[int | None] = mapped_column(Integer)
 
 
 class Interaction(Base):

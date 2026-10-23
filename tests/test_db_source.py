@@ -100,3 +100,19 @@ def test_existing_indices_do_not_move_when_new_data_arrives(db, tmp_path):
     assert {k: after[k] for k in before} == before  # nothing moved
     assert after[20] == 2  # appended, not inserted in sorted position
     assert dict(db.execute(select(User.ml_user_id, User.user_idx)).all()) == {5: 0, 3: 1}
+
+
+def test_links_csv_populates_tmdb_ids_and_is_optional(db, tmp_path):
+    pd.DataFrame([(1, 5, 5.0, 100)], columns=["userId", "movieId", "rating", "timestamp"]).to_csv(tmp_path / "ratings.csv", index=False)
+    pd.DataFrame([(5, "A (2000)", "Drama"), (6, "B (2001)", "Comedy")], columns=["movieId", "title", "genres"]).to_csv(
+        tmp_path / "movies.csv", index=False)
+
+    ingest_movielens(db, tmp_path)  # no links.csv: tmdb_id stays NULL, nothing breaks
+    db.commit()
+    assert db.scalars(select(Movie.tmdb_id)).all() == [None, None]
+
+    pd.DataFrame({"movieId": [5, 6, 7], "imdbId": [1, 2, 3], "tmdbId": [111.0, None, 333.0]}).to_csv(
+        tmp_path / "links.csv", index=False)  # 6 has no tmdbId, 7 is not in movies.csv
+    ingest_movielens(db, tmp_path)  # re-run on an existing catalogue fills in the new column
+    db.commit()
+    assert dict(db.execute(select(Movie.movie_id, Movie.tmdb_id)).all()) == {5: 111, 6: None}
