@@ -6,3 +6,4 @@ artifacts/
 artifacts_synth/
 artifacts_ci/
 .pytest_cache/
+artifacts_smoke/

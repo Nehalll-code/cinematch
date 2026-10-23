@@ -10,9 +10,12 @@ from __future__ import annotations
 import argparse
 import io
 import shutil
+import ssl
 import urllib.request
 import zipfile
 from pathlib import Path
+
+import certifi
 
 URLS = {
     "small": ("https://files.grouplens.org/datasets/movielens/ml-latest-small.zip", "ml-latest-small"),
@@ -32,7 +35,11 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
 
     print(f"downloading {url}")
-    with urllib.request.urlopen(url) as resp:
+    # python.org builds on Windows/macOS don't always ship a usable system trust store, which
+    # surfaces as CERTIFICATE_VERIFY_FAILED. Verify against certifi's bundle instead of
+    # disabling verification.
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    with urllib.request.urlopen(url, context=ctx) as resp:
         blob = resp.read()
     with zipfile.ZipFile(io.BytesIO(blob)) as zf:
         zf.extractall(out)
