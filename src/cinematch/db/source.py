@@ -29,20 +29,30 @@ def _require_contiguous(idx: list[int], what: str) -> None:
         )
 
 
+def persisted_item_ids(session: Session) -> np.ndarray:
+    """movie_id for item_idx 0..n-1, in index order."""
+    rows = session.execute(select(Movie.item_idx, Movie.movie_id).order_by(Movie.item_idx)).all()
+    _require_contiguous([r.item_idx for r in rows], "movies.item_idx")
+    return np.array([r.movie_id for r in rows], dtype=np.int64)
+
+
+def persisted_user_ids(session: Session) -> np.ndarray:
+    """MovieLens id (or -users.id for registered accounts) for user_idx 0..n-1, in index order.
+
+    Registered accounts have no MovieLens id; -users.id keeps the array unique and integer-typed,
+    and cannot collide with a MovieLens id because those are positive.
+    """
+    rows = session.execute(select(User.user_idx, User.ml_user_id, User.id).order_by(User.user_idx)).all()
+    _require_contiguous([r.user_idx for r in rows], "users.user_idx")
+    return np.array([r.ml_user_id if r.ml_user_id is not None else -r.id for r in rows], dtype=np.int64)
+
+
 def load_dataset_from_db(session: Session, threshold: float = POSITIVE_THRESHOLD) -> Dataset:
     movie_rows = session.execute(
         select(Movie.item_idx, Movie.movie_id, Movie.title, Movie.genres).order_by(Movie.item_idx)
     ).all()
-    user_rows = session.execute(
-        select(User.user_idx, User.ml_user_id, User.id).order_by(User.user_idx)
-    ).all()
-    _require_contiguous([r.item_idx for r in movie_rows], "movies.item_idx")
-    _require_contiguous([r.user_idx for r in user_rows], "users.user_idx")
-
-    item_ids = np.array([r.movie_id for r in movie_rows], dtype=np.int64)
-    # Registered accounts have no MovieLens id; -users.id keeps Dataset.user_ids unique and
-    # integer-typed, and cannot collide with a MovieLens id because those are positive.
-    user_ids = np.array([r.ml_user_id if r.ml_user_id is not None else -r.id for r in user_rows], dtype=np.int64)
+    item_ids = persisted_item_ids(session)
+    user_ids = persisted_user_ids(session)
 
     items = pd.DataFrame(
         {

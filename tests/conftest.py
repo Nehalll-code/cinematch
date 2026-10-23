@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -6,6 +7,10 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+
+# Hermetic: a developer's DATABASE_URL must never leak into tests (the API would try to verify a
+# synthetic artifact against their real database). DB tests build their own engines explicitly.
+os.environ.pop("DATABASE_URL", None)
 
 
 @pytest.fixture(scope="session")
@@ -30,7 +35,6 @@ def dataset(synthetic_dir):
 # PostgreSQL when CINEMATCH_TEST_DATABASE_URL is set (CI service container, or `make db-up`).
 # Without it the Postgres variants are reported as skipped, not silently passed.
 # --------------------------------------------------------------------------------------------
-import os  # noqa: E402
 
 
 def _alembic_config(url: str):

@@ -1,12 +1,17 @@
 """FastAPI serving layer.
 
 Scope note, stated plainly because it matters for how this should be
-read: there is no PostgreSQL and no Redis here. Artifacts are loaded
-into process memory at startup and recommendations are memoised in an
-LRU. That is the honest shape of a single-node service; adding a
-database and an external cache changes the operational story, not the
-recommendation quality, and is listed as future work rather than
-claimed.
+read: recommendations are served from a model artifact loaded into
+process memory at startup and memoised in an in-process LRU; there is no
+Redis. PostgreSQL (when DATABASE_URL is set) holds users, interactions
+and the watchlist, and is NOT consulted per recommendation. Writes are
+stored but do not reach the model: there is no online feedback loop or
+scheduled retraining.
+
+If a database is configured, startup compares the artifact's index space
+with it and REFUSES TO START on a mismatch (cinematch.db.verify): a model
+whose item_idx -> movie mapping has drifted would serve wrong films with
+no error.
 
 Latency is measured in-process and exposed at /metrics so the numbers
 reported anywhere else can be reproduced rather than asserted.
@@ -51,7 +56,27 @@ async def lifespan(app: FastAPI):
             blob = pickle.load(fh)
         STATE["model"] = blob["model"]
         STATE["dataset"] = blob["dataset"]
+
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        from .db.session import make_engine, make_session_factory
+        from .db.verify import verify_artifact_index
+
+        engine = make_engine(db_url)
+        STATE["engine"] = engine
+        STATE["session_factory"] = make_session_factory(engine)
+        try:
+            if "model" in STATE:
+                ds = STATE["dataset"]
+                with STATE["session_factory"]() as session:
+                    STATE["index_report"] = verify_artifact_index(session, ds.item_ids, ds.user_ids)
+        except Exception:
+            engine.dispose()
+            STATE.clear()
+            raise
     yield
+    if "engine" in STATE:
+        STATE["engine"].dispose()
     STATE.clear()
 
 
@@ -77,6 +102,8 @@ def health() -> dict:
     return {
         "status": "ok" if loaded else "degraded",
         "model_loaded": loaded,
+        "db_configured": "engine" in STATE,
+        "index_verified": "index_report" in STATE,
         "n_users": getattr(ds, "n_users", 0),
         "n_items": getattr(ds, "n_items", 0),
     }
