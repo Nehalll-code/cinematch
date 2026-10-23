@@ -25,3 +25,6 @@ class PopularityRecommender(Recommender):
 
     def score_users(self, user_indices: np.ndarray) -> np.ndarray:
         return np.tile(self.scores_, (len(user_indices), 1))
+
+    def score_from_items(self, item_indices: np.ndarray, cache_key=None) -> np.ndarray:
+        return self.scores_.copy()

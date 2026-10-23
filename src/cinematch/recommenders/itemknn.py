@@ -48,3 +48,10 @@ class ItemKNNRecommender(Recommender):
     def score_users(self, user_indices: np.ndarray) -> np.ndarray:
         profile = self.train_matrix[user_indices]
         return np.asarray((profile @ self.similarity_).todense(), dtype=np.float32)
+
+    def score_from_items(self, item_indices: np.ndarray, cache_key=None) -> np.ndarray:
+        profile = sp.csr_matrix(
+            (np.ones(len(item_indices), dtype=np.float32), (np.zeros(len(item_indices), dtype=int), item_indices)),
+            shape=(1, self.similarity_.shape[0]),
+        )
+        return np.asarray((profile @ self.similarity_).todense(), dtype=np.float32).ravel()

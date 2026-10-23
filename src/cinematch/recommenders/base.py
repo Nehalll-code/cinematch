@@ -31,6 +31,17 @@ class Recommender(ABC):
     def score_users(self, user_indices: np.ndarray) -> np.ndarray:
         ...
 
+    def score_from_items(self, item_indices: np.ndarray, cache_key=None) -> np.ndarray:
+        """Score every item for a user described ONLY by the items they liked.
+
+        This is how a user who was not in training gets personalised results without retraining:
+        the fitted item-side parameters stay fixed and the user side is derived from the items.
+        `cache_key` is an optional hashable (user, version-stamp) that models with an expensive
+        derivation may use to reuse it. Returns raw scores of shape (n_items,); masking already-seen
+        items is the caller's job, as everywhere else.
+        """
+        raise NotImplementedError(f"{self.name} cannot score a user from items alone")
+
     def recommend_with_scores(
         self, user_idx: int, k: int = 10, exclude_seen: bool = True
     ) -> tuple[np.ndarray, np.ndarray]:

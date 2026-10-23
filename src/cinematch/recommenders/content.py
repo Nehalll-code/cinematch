@@ -55,3 +55,13 @@ class ContentRecommender(Recommender):
     def score_users(self, user_indices: np.ndarray) -> np.ndarray:
         prof = self.user_profiles_[user_indices]
         return np.asarray((prof @ self.item_features_.T).todense(), dtype=np.float32)
+
+    def profile_from_items(self, item_indices: np.ndarray) -> sp.csr_matrix:
+        """Normalised mean TF-IDF vector of the given items: the same profile `fit` builds per user."""
+        if len(item_indices) == 0:
+            return sp.csr_matrix((1, self.item_features_.shape[1]), dtype=np.float32)
+        return normalize(sp.csr_matrix(self.item_features_[item_indices].mean(axis=0)))
+
+    def score_from_items(self, item_indices: np.ndarray, cache_key=None) -> np.ndarray:
+        prof = self.profile_from_items(np.asarray(item_indices))
+        return np.asarray((prof @ self.item_features_.T).todense(), dtype=np.float32).ravel()

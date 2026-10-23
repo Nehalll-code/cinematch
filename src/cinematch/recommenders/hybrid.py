@@ -48,3 +48,21 @@ class HybridRecommender(Recommender):
         if cold.any():
             out[cold] = rank_normalize(self.fallback.score_users(user_indices[cold]))
         return out
+
+    def score_from_items(self, item_indices: np.ndarray, cache_key=None) -> np.ndarray:
+        """`score_users` for a user known only by the items they liked (e.g. registered after training).
+
+        Same rule as the batch path: below `cold_threshold` liked items the user gets popularity;
+        otherwise a weighted blend of rank-normalised component scores. Zero-weight components are
+        skipped (they would contribute exactly 0), which also avoids their cost.
+        """
+        item_indices = np.asarray(item_indices, dtype=np.int64)
+        if len(item_indices) < self.cold_threshold:
+            return rank_normalize(self.fallback.scores_[None, :])[0]
+        total_w = sum(w for _, w in self.components.values())
+        out = np.zeros(self.dataset.n_items, dtype=np.float32)
+        for rec, weight in self.components.values():
+            if weight == 0:
+                continue
+            out += (weight / total_w) * rank_normalize(rec.score_from_items(item_indices, cache_key)[None, :])[0]
+        return out
