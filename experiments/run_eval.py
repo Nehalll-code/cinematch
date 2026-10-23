@@ -2,6 +2,10 @@
 """Train every model on one split and emit the comparison table.
 
     python experiments/run_eval.py --data data/ml-1m --split temporal --k 10 [--tune-hybrid]
+    python experiments/run_eval.py --source db --split temporal      # reads DATABASE_URL
+
+The CSV source is the default and needs no database. Both sources yield identical data
+(tests/test_db_source.py), so the numbers do not depend on where the data lives.
 """
 from __future__ import annotations
 
@@ -15,7 +19,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pandas as pd
 
-from cinematch.data import load_movielens
 from cinematch.evaluate import evaluate, results_table
 from cinematch.recommenders import (
     ContentRecommender,
@@ -24,13 +27,15 @@ from cinematch.recommenders import (
     ItemKNNRecommender,
     PopularityRecommender,
 )
+from cinematch.loading import SOURCES, load_dataset
 from cinematch.split import filter_test_to_known_users, global_temporal_split, leave_one_out_split
 from cinematch.tuning import DEFAULT_GRID, tune_content_weight
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default="data")
+    ap.add_argument("--source", choices=SOURCES, default="csv")
+    ap.add_argument("--data", default="data/ml-1m", help="directory with ratings.csv/movies.csv (csv source)")
     ap.add_argument("--split", choices=["temporal", "loo"], default="temporal")
     ap.add_argument("--test-frac", type=float, default=0.2)
     ap.add_argument("--k", type=int, default=10)
@@ -40,7 +45,7 @@ def main() -> None:
                     help="tune the content/iALS fusion weight on a validation split carved from train")
     args = ap.parse_args()
 
-    ds = load_movielens(args.data)
+    ds = load_dataset(args.source, args.data)
     print(f"{len(ds.interactions)} positive interactions | {ds.n_users} users | {ds.n_items} items")
 
     if args.split == "temporal":
