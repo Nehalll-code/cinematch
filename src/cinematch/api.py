@@ -29,7 +29,9 @@ import numpy as np
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
-STATE: dict = {}
+from .accounts import router as accounts_router
+from .state import STATE
+
 LATENCIES: list[float] = []
 
 
@@ -59,6 +61,7 @@ async def lifespan(app: FastAPI):
 
     db_url = os.environ.get("DATABASE_URL")
     if db_url:
+        from .auth import jwt_secret
         from .db.session import make_engine, make_session_factory
         from .db.verify import verify_artifact_index
 
@@ -66,6 +69,7 @@ async def lifespan(app: FastAPI):
         STATE["engine"] = engine
         STATE["session_factory"] = make_session_factory(engine)
         try:
+            STATE["jwt_secret"] = jwt_secret()  # fail fast: no secret, no service
             if "model" in STATE:
                 ds = STATE["dataset"]
                 with STATE["session_factory"]() as session:
@@ -81,6 +85,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="CineMatch", version="0.1.0", lifespan=lifespan)
+app.include_router(accounts_router)
 
 
 def _require_model():

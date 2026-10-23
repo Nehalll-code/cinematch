@@ -19,6 +19,7 @@ import pandas as pd
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .dialect import insert_for
 from .indexing import ITEM_IDX, USER_IDX, allocate
 from .models import Interaction, Movie, User
 
@@ -30,15 +31,6 @@ class IngestStats:
     movies: int
     users: int
     interactions: int
-
-
-def _insert(session: Session, model):
-    # ON CONFLICT DO NOTHING exists in both dialects but under different modules.
-    if session.get_bind().dialect.name == "postgresql":
-        from sqlalchemy.dialects.postgresql import insert
-    else:
-        from sqlalchemy.dialects.sqlite import insert
-    return insert(model)
 
 
 def ingest_movielens(session: Session, data_dir: str | Path) -> IngestStats:
@@ -69,7 +61,7 @@ def _ingest_movies(session: Session, movies: pd.DataFrame) -> int:
          "genres": "" if pd.isna(r.genres) else str(r.genres)}
         for i, r in enumerate(new.itertuples(index=False))
     ]
-    session.execute(_insert(session, Movie), rows)
+    session.execute(insert_for(session, Movie), rows)
     return len(rows)
 
 
@@ -79,7 +71,7 @@ def _ingest_users(session: Session, ml_ids: list[int]) -> tuple[int, dict[int, i
     if new:
         first = allocate(session, USER_IDX, len(new))
         session.execute(
-            _insert(session, User),
+            insert_for(session, User),
             [{"user_idx": first + i, "ml_user_id": int(u)} for i, u in enumerate(new)],
         )
     pk = {ml: pk for ml, pk in session.execute(select(User.ml_user_id, User.id)) if ml is not None}
@@ -88,7 +80,7 @@ def _ingest_users(session: Session, ml_ids: list[int]) -> tuple[int, dict[int, i
 
 def _ingest_interactions(session: Session, ratings: pd.DataFrame, user_pk: dict[int, int]) -> int:
     before = session.scalar(select(func.count()).select_from(Interaction))
-    stmt = _insert(session, Interaction).on_conflict_do_nothing(
+    stmt = insert_for(session, Interaction).on_conflict_do_nothing(
         index_elements=["user_id", "movie_id", "type"]
     )
     for start in range(0, len(ratings), CHUNK):
