@@ -94,3 +94,30 @@ def test_a_best_value_on_the_grid_edge_is_flagged(dataset, train):
     for name in res.edge_params:
         values = res.grid[name]
         assert res.best_params[name] in (min(values), max(values))
+
+
+def test_prior_trials_are_reused_not_refit_and_compete_for_best(dataset, train, monkeypatch):
+    first = tuning.tune_model(dataset, train, "temporal", make_model=ItemKNNRecommender,
+                              grid={"k": [10, 50], "shrink": [10.0]}, k=10, min_train=5)
+    fits = []
+    real_fit = ItemKNNRecommender.fit
+    monkeypatch.setattr(ItemKNNRecommender, "fit", lambda self, *a, **k: (fits.append((self.k, self.shrink)), real_fit(self, *a, **k))[1])
+    second = tuning.tune_model(dataset, train, "temporal", make_model=ItemKNNRecommender,
+                               grid={"k": [10, 50, 100], "shrink": [10.0]}, k=10, min_train=5,
+                               prior_trials=first.trials)
+    assert fits == [(100, 10.0)]  # only the genuinely new combination was fit
+    assert [t["params"]["k"] for t in second.trials] == [10, 50, 100]
+    assert second.best_ndcg == max(t["ndcg"] for t in second.trials)
+    assert second.grid["k"] == [10, 50, 100]
+
+
+def test_union_grid_decides_what_counts_as_the_edge(dataset, train):
+    # a best value that was on the edge of stage 1 is no longer on the edge once the grid is extended
+    first = tuning.tune_model(dataset, train, "temporal", make_model=ItemKNNRecommender,
+                              grid={"k": [10], "shrink": [0.0, 10.0]}, k=10, min_train=5)
+    wider = tuning.tune_model(dataset, train, "temporal", make_model=ItemKNNRecommender,
+                              grid={"k": [10], "shrink": [0.0, 10.0, 1000.0]}, k=10, min_train=5,
+                              prior_trials=first.trials)
+    assert wider.grid["shrink"] == [0.0, 10.0, 1000.0]
+    for name in wider.edge_params:
+        assert wider.best_params[name] in (min(wider.grid[name]), max(wider.grid[name]))

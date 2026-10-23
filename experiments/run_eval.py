@@ -29,7 +29,7 @@ from cinematch.recommenders import (
 )
 from cinematch.loading import SOURCES, load_dataset
 from cinematch.split import filter_test_to_known_users, global_temporal_split, leave_one_out_split
-from cinematch.tuning import DEFAULT_GRID, IALS_GRID, KNN_GRID, tune_content_weight, tune_model
+from cinematch.tuning import DEFAULT_GRID, IALS_GRID, IALS_GRID_STAGE2, KNN_GRID, tune_content_weight, tune_model
 
 
 def main() -> None:
@@ -46,6 +46,11 @@ def main() -> None:
     ap.add_argument("--tune-models", action="store_true",
                     help="grid-search iALS and item-kNN hyperparameters on the same validation split; "
                          "tuned models are added as extra rows and the hybrid weight (if tuned) uses tuned iALS")
+    ap.add_argument("--ials-stages", type=int, choices=[1, 2], default=1,
+                    help="2 also searches IALS_GRID_STAGE2 (the extension after stage 1 hit a grid edge)")
+    ap.add_argument("--prior-tuning", default=None,
+                    help="dir with results_<split>_k<k>.json from an earlier --tune-models run: its trials are "
+                         "reused (not refit) and compete with the new ones")
     args = ap.parse_args()
 
     ds = load_dataset(args.source, args.data)
@@ -75,16 +80,24 @@ def main() -> None:
     # Everything below is chosen on a validation split carved from `train`; `test` is never passed in.
     tuned_ials_params: dict = {}
     if args.tune_models:
-        for label, factory, grid in (
-            ("item_knn", lambda **p: ItemKNNRecommender(**p), KNN_GRID),
-            ("ials", make_ials, IALS_GRID),
+        prior = {}
+        if args.prior_tuning:
+            old = json.loads((Path(args.prior_tuning) / f"results_{args.split}_k{args.k}.json").read_text())["tuning"]
+            prior = {label: old[label]["trials"] for label in ("item_knn", "ials")}
+        for label, factory, grids in (
+            ("item_knn", lambda **p: ItemKNNRecommender(**p), [KNN_GRID]),
+            ("ials", make_ials, [IALS_GRID, IALS_GRID_STAGE2][: args.ials_stages]),
         ):
-            res = tune_model(ds, train, args.split, make_model=factory, grid=grid, k=args.k, min_train=args.min_train)
+            trials = prior.get(label, [])
+            for grid in grids:  # stages in order; each stage reuses every earlier trial
+                res = tune_model(ds, train, args.split, make_model=factory, grid=grid, k=args.k,
+                                 min_train=args.min_train, prior_trials=trials)
+                trials = res.trials
             tuning[label] = {"best_params": res.best_params, "best_val_ndcg": res.best_ndcg,
                              "edge_params": res.edge_params, "grid": res.grid,
                              "n_validation_users": res.n_validation_users, "trials": res.trials}
-            print(f"tuned {label} on validation ({res.n_validation_users} users): {res.best_params} "
-                  f"val_ndcg={res.best_ndcg:.4f} edge_of_grid={res.edge_params or 'no'}", flush=True)
+            print(f"tuned {label} on validation ({res.n_validation_users} users, {len(res.trials)} trials): "
+                  f"{res.best_params} val_ndcg={res.best_ndcg:.4f} edge_of_grid={res.edge_params or 'no'}", flush=True)
         knn_t = ItemKNNRecommender(**tuning["item_knn"]["best_params"])
         knn_t.name = "item_knn_tuned"
         tuned_ials_params = tuning["ials"]["best_params"]

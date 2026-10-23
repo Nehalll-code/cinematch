@@ -38,6 +38,14 @@ IALS_GRID = {
 # k was first searched up to 400, and the best value sat on that upper edge on both splits, so the
 # range was extended up to 3883 = every neighbour kept (ml-1m's catalogue size; a larger k than the
 # catalogue just means "no pruning").
+# Stage 2 for iALS. Stage 1 put regularization on its upper edge on both splits (and `factors` on
+# its lower edge on temporal). Stronger regularization is what makes larger models viable, so the
+# extension varies factors and regularization together. Stage-1 trials are reused, not refit.
+IALS_GRID_STAGE2 = {
+    "factors": [16, 32, 64, 128],
+    "regularization": [10.0, 30.0, 100.0, 300.0],
+    "alpha": [0.5, 1.0, 2.0],
+}
 KNN_GRID = {"k": [50, 100, 200, 400, 800, 1600, 3883], "shrink": [0.0, 10.0, 50.0, 200.0]}
 
 
@@ -127,8 +135,14 @@ def tune_model(
     k: int = 10,
     min_train: int = 5,
     val_frac: float = 0.2,
+    prior_trials: Sequence[Mapping] = (),
 ) -> ModelTuning:
     """Exhaustive grid search of `make_model(**params)` by validation NDCG@k.
+
+    `prior_trials` are trials from an earlier stage of the SAME search (same train, strategy, k,
+    min_train, val_frac, and a deterministic model; the validation split is deterministic, so their
+    scores are comparable). They are kept, not refit, and compete for best with the new ones. This
+    is how a grid is extended after the optimum lands on its edge without redoing finished work.
 
     Same protocol as tune_content_weight: the validation split is carved out of `train`, models
     are fit on train_inner, and no test data can be passed in. Combinations are visited in
@@ -138,9 +152,12 @@ def tune_model(
     val = filter_test_to_known_users(inner, val, min_train)
 
     names = list(grid)
-    trials = []
+    trials = [dict(tr) for tr in prior_trials]
+    done = [tr["params"] for tr in trials]
     for values in itertools.product(*(grid[n] for n in names)):
         params = dict(zip(names, values))
+        if params in done:
+            continue
         t0 = time.perf_counter()
         model = make_model(**params).fit(dataset, inner)
         fit_seconds = time.perf_counter() - t0
@@ -148,12 +165,14 @@ def tune_model(
         trials.append({"params": params, "ndcg": m.ndcg, "recall": m.recall, "fit_seconds": round(fit_seconds, 2)})
 
     best = max(trials, key=lambda tr: tr["ndcg"])  # max() returns the first maximal element
-    edge = [n for n in names if len(grid[n]) > 1 and best["params"][n] in (min(grid[n]), max(grid[n]))]
+    # the searched range is everything ever tried, so an extension can move the optimum off the edge
+    searched = {n: sorted({tr["params"][n] for tr in trials}) for n in names}
+    edge = [n for n in names if len(searched[n]) > 1 and best["params"][n] in (searched[n][0], searched[n][-1])]
     return ModelTuning(
         best_params=best["params"],
         best_ndcg=best["ndcg"],
         trials=trials,
-        grid={n: list(grid[n]) for n in names},
+        grid=searched,
         n_validation_users=int(val["user_idx"].nunique()),
         edge_params=edge,
     )
