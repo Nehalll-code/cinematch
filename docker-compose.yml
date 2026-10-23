@@ -1,0 +1,25 @@
+# One command: `docker compose up -d --wait` (or `make db-up`).
+# Development database only. The credentials below are throwaway defaults for localhost;
+# override them via .env (see .env.example) and use real secrets anywhere else.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cinematch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cinematch_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-cinematch}
+    ports:
+      # loopback only: a default dev password must not be reachable from the LAN
+      - "127.0.0.1:${CINEMATCH_DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # runs once, on first initialisation of the volume: creates the separate test database
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

@@ -1,4 +1,4 @@
-.PHONY: install data data-small synth smoke train eval eval-loo bench api test clean
+.PHONY: install data data-small synth smoke train eval eval-loo bench api test clean db-up db-down db-migrate db-ingest test-pg
 
 install:
 	pip install -r requirements.txt
@@ -32,6 +32,18 @@ api:
 
 test:
 	python -m pytest tests/ -q
+
+db-up:           ## start Postgres (docker compose), wait until healthy
+	docker compose up -d --wait
+
+db-down:
+	docker compose down
+
+db-migrate:      ## apply Alembic migrations to $$DATABASE_URL
+	python -m alembic upgrade head
+
+test-pg:         ## run the suite with the Postgres variants of the DB tests enabled
+	CINEMATCH_TEST_DATABASE_URL=postgresql+psycopg://cinematch:cinematch_dev@127.0.0.1:5432/cinematch_test python -m pytest tests/ -q -rs
 
 clean:
 	rm -rf artifacts artifacts_synth data_synthetic .pytest_cache
