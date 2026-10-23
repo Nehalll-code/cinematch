@@ -12,8 +12,10 @@ weight; the weight changes the fusion, not the fitted models.
 """
 from __future__ import annotations
 
+import itertools
+import time
 from dataclasses import dataclass
-from typing import Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
@@ -85,4 +87,60 @@ def tune_content_weight(
         best_ndcg=best["ndcg"],
         curve=curve,
         n_validation_users=int(val["user_idx"].nunique()),
+    )
+
+
+@dataclass
+class ModelTuning:
+    """Outcome of a grid search for one model, scored on the validation split only."""
+
+    best_params: dict[str, Any]
+    best_ndcg: float
+    trials: list[dict]  # [{params, ndcg, recall, fit_seconds}, ...] in grid order
+    grid: dict[str, list]
+    n_validation_users: int
+    # Params whose best value is the smallest or largest searched value. The true optimum may lie
+    # outside the grid; callers must say so instead of presenting the result as settled.
+    edge_params: list[str]
+
+
+def tune_model(
+    dataset: Dataset,
+    train: pd.DataFrame,
+    strategy: str,
+    *,
+    make_model: Callable[..., Recommender],
+    grid: Mapping[str, Sequence],
+    k: int = 10,
+    min_train: int = 5,
+    val_frac: float = 0.2,
+) -> ModelTuning:
+    """Exhaustive grid search of `make_model(**params)` by validation NDCG@k.
+
+    Same protocol as tune_content_weight: the validation split is carved out of `train`, models
+    are fit on train_inner, and no test data can be passed in. Combinations are visited in
+    itertools.product order (last key varies fastest) and the first maximum wins ties.
+    """
+    inner, val = carve_validation(train, strategy, val_frac)
+    val = filter_test_to_known_users(inner, val, min_train)
+
+    names = list(grid)
+    trials = []
+    for values in itertools.product(*(grid[n] for n in names)):
+        params = dict(zip(names, values))
+        t0 = time.perf_counter()
+        model = make_model(**params).fit(dataset, inner)
+        fit_seconds = time.perf_counter() - t0
+        m = evaluate(model, dataset, inner, val, k=k)
+        trials.append({"params": params, "ndcg": m.ndcg, "recall": m.recall, "fit_seconds": round(fit_seconds, 2)})
+
+    best = max(trials, key=lambda tr: tr["ndcg"])  # max() returns the first maximal element
+    edge = [n for n in names if len(grid[n]) > 1 and best["params"][n] in (min(grid[n]), max(grid[n]))]
+    return ModelTuning(
+        best_params=best["params"],
+        best_ndcg=best["ndcg"],
+        trials=trials,
+        grid={n: list(grid[n]) for n in names},
+        n_validation_users=int(val["user_idx"].nunique()),
+        edge_params=edge,
     )
