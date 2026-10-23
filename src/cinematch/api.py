@@ -30,6 +30,7 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 from .accounts import router as accounts_router
+from .user_data import router as user_data_router
 from .state import STATE
 
 LATENCIES: list[float] = []
@@ -86,6 +87,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="CineMatch", version="0.1.0", lifespan=lifespan)
 app.include_router(accounts_router)
+app.include_router(user_data_router)
 
 
 def _require_model():
