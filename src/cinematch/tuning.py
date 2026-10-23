@@ -35,7 +35,10 @@ IALS_GRID = {
     "regularization": [0.1, 1.0, 10.0],
     "alpha": [0.25, 0.5, 1.0, 2.0, 5.0],
 }
-KNN_GRID = {"k": [50, 100, 200, 400], "shrink": [0.0, 10.0, 50.0, 200.0]}
+# k was first searched up to 400, and the best value sat on that upper edge on both splits, so the
+# range was extended up to 3883 = every neighbour kept (ml-1m's catalogue size; a larger k than the
+# catalogue just means "no pruning").
+KNN_GRID = {"k": [50, 100, 200, 400, 800, 1600, 3883], "shrink": [0.0, 10.0, 50.0, 200.0]}
 
 
 @dataclass
