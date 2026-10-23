@@ -97,9 +97,11 @@ def _require_model():
 
 
 @lru_cache(maxsize=4096)
-def _cached_recommend(user_idx: int, k: int) -> tuple[int, ...]:
+def _cached_recommend(user_idx: int, k: int) -> tuple[tuple[int, float], ...]:
+    """(item_idx, score) pairs. Scores are cached WITH the ranking: a hit must not touch the model."""
     model, _ = _require_model()
-    return tuple(int(i) for i in model.recommend(user_idx, k=k))
+    items, scores = model.recommend_with_scores(user_idx, k=k)
+    return tuple((int(i), float(sc)) for i, sc in zip(items, scores))
 
 
 @app.get("/health")
@@ -142,18 +144,17 @@ def recommend(user_id: int, k: int = Query(10, ge=1, le=100)) -> Recommendations
 
     before = _cached_recommend.cache_info().hits
     t0 = time.perf_counter()
-    item_idxs = _cached_recommend(user_idx, k)
+    ranked = _cached_recommend(user_idx, k)
     elapsed = (time.perf_counter() - t0) * 1000
     LATENCIES.append(elapsed)
     cached = _cached_recommend.cache_info().hits > before
 
-    scores = model.score_users(np.array([user_idx]))[0]
     return Recommendations(
         user_id=user_id,
         cold_start=bool(model.user_counts_[user_idx] < model.cold_threshold),
         latency_ms=round(elapsed, 3),
         cached=cached,
-        items=[_movie(ds, i, float(scores[i])) for i in item_idxs],
+        items=[_movie(ds, i, score) for i, score in ranked],
     )
 
 

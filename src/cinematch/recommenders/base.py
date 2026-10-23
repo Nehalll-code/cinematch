@@ -31,14 +31,26 @@ class Recommender(ABC):
     def score_users(self, user_indices: np.ndarray) -> np.ndarray:
         ...
 
-    def recommend(self, user_idx: int, k: int = 10, exclude_seen: bool = True) -> np.ndarray:
+    def recommend_with_scores(
+        self, user_idx: int, k: int = 10, exclude_seen: bool = True
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Top-k item indices and their scores from ONE scoring pass.
+
+        Callers that need to show scores (the API) must use this rather than calling
+        `recommend` and then `score_users` again: scoring is the expensive part, and doing it twice
+        defeats any cache placed in front.
+        """
         scores = self.score_users(np.array([user_idx]))[0]
         if exclude_seen and self.train_matrix is not None:
             seen = self.train_matrix[user_idx].indices
             scores[seen] = -np.inf
         k = min(k, len(scores))
         top = np.argpartition(-scores, k - 1)[:k]
-        return top[np.argsort(-scores[top])]
+        top = top[np.argsort(-scores[top])]
+        return top, scores[top]
+
+    def recommend(self, user_idx: int, k: int = 10, exclude_seen: bool = True) -> np.ndarray:
+        return self.recommend_with_scores(user_idx, k, exclude_seen)[0]
 
 
 def rank_normalize(scores: np.ndarray) -> np.ndarray:

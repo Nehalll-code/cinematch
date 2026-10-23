@@ -66,3 +66,33 @@ def test_metrics_expose_latency_percentiles(client):
 def test_similar_excludes_the_query_movie(client):
     body = client.get("/similar/1?k=5").json()
     assert len(body) == 5 and all(m["movie_id"] != 1 for m in body)
+
+
+def test_a_cache_hit_does_not_rescore_the_model(client):
+    # The cache is only worth anything if a hit skips the model entirely. It used to memoise the
+    # item ids but then call score_users again for the display scores, saving nothing end to end.
+    from cinematch.state import STATE
+
+    model, calls = STATE["model"], []
+    original = model.score_users
+    model.score_users = lambda users: (calls.append(1), original(users))[1]
+    try:
+        first = client.get("/recommend/7?k=6").json()
+        scored_on_miss = len(calls)
+        second = client.get("/recommend/7?k=6").json()
+    finally:
+        del model.score_users  # drop the instance attribute; the class method is back in effect
+    assert first["cached"] is False and second["cached"] is True
+    assert scored_on_miss >= 1 and len(calls) == scored_on_miss  # the hit made zero model calls
+    assert second["items"] == first["items"]  # same movies AND same scores from the cache
+
+
+def test_scores_come_from_the_same_pass_that_ranked_the_items(client):
+    from cinematch.state import STATE
+
+    body = client.get("/recommend/9?k=5").json()
+    model, ds = STATE["model"], STATE["dataset"]
+    uidx = int(list(ds.user_ids).index(9))
+    idxs, scores = model.recommend_with_scores(uidx, k=5)
+    assert [m["movie_id"] for m in body["items"]] == [int(ds.item_ids[i]) for i in idxs]
+    assert [m["score"] for m in body["items"]] == [round(float(s), 5) for s in scores]
