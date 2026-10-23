@@ -1,0 +1,22 @@
+[
+  {
+    "movie_id": 1,
+    "title": "Toy Story (1995)",
+    "year": 1995,
+    "genres": [
+      "Animation",
+      "Children's",
+      "Comedy"
+    ]
+  },
+  {
+    "movie_id": 3114,
+    "title": "Toy Story 2 (1999)",
+    "year": 1999,
+    "genres": [
+      "Animation",
+      "Children's",
+      "Comedy"
+    ]
+  }
+]

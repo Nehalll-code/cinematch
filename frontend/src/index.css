@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* Design tokens. This file is the single source of truth: components reference these variables,
+   and src/test/contrast.test.ts parses this file and fails the build if a text/background pair
+   used by the UI drops below WCAG AA. */
+@theme {
+  --color-bg: #0A0E1A;
+  --color-solid: #0E1424;             /* solid surface behind body text */
+  --color-glass: rgba(255, 255, 255, 0.04);
+  --color-line: rgba(120, 200, 255, 0.18);          /* decorative container borders only */
+  --color-control-line: rgba(120, 200, 255, 0.55);  /* inputs/buttons: >= 3:1 against bg (WCAG 1.4.11) */
+  --color-accent: #4DD0E1;            /* cyan: the one accent doing real work */
+  --color-accent-2: #7C5CFF;          /* violet: secondary state, NON-TEXT only (4.4:1 as text fails AA) */
+  --color-accent-2-text: #A99BFF;     /* violet tint that passes AA when it must carry text */
+  --color-text: #E8EEF5;
+  --color-muted: #8A97AB;
+  --color-danger: #FF9AA6;
+  --radius-panel: 12px;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+html { color-scheme: dark; }
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Glass container with ONE bevelled 24px corner. The 1px border is drawn by the wrapper's
+   background showing around an inner box clipped to the same polygon; a plain `border` would
+   leave a gap along the diagonal cut. */
+.panel {
+  --cut: 24px;
+  background: var(--color-line);
+  padding: 1px;
+  border-radius: var(--radius-panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+}
+.panel > .panel-inner {
+  background: var(--color-glass);
+  backdrop-filter: blur(8px);
+  border-radius: calc(var(--radius-panel) - 1px);
+  height: 100%;
+  clip-path: polygon(0 0, calc(100% - var(--cut) + 0.5px) 0, 100% calc(var(--cut) - 0.5px), 100% 100%, 0 100%);
+}
+/* body text always sits on a SOLID surface, never on translucency */
+.solid { background: var(--color-solid); }
+
+/* Interaction: 150-200ms ease-out; glow ONLY on interactive/focused elements. No ambient animation. */
+.interactive {
+  transition: box-shadow 160ms ease-out, border-color 160ms ease-out, background-color 160ms ease-out,
+              transform 160ms ease-out, color 160ms ease-out;
+}
+.interactive:hover:not(:disabled) { border-color: var(--color-accent); }
+.interactive:focus-visible, .glow-focus:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 14px 0 rgba(77, 208, 225, 0.45);
+}
+@media (prefers-reduced-motion: reduce) { .interactive { transition: none; } }
+
+.scroll-x { scrollbar-width: thin; scrollbar-color: var(--color-control-line) transparent; }

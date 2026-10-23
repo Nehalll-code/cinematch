@@ -1,0 +1,11 @@
+{
+  "movie_id": 1,
+  "title": "Toy Story (1995)",
+  "year": 1995,
+  "genres": [
+    "Animation",
+    "Children's",
+    "Comedy"
+  ],
+  "poster_available": false
+}

@@ -1,0 +1,112 @@
+[
+  {
+    "movie_id": 3114,
+    "title": "Toy Story 2 (1999)",
+    "genres": [
+      "Animation",
+      "Children's",
+      "Comedy"
+    ],
+    "score": 1
+  },
+  {
+    "movie_id": 2559,
+    "title": "King and I, The (1999)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.61512
+  },
+  {
+    "movie_id": 2687,
+    "title": "Tarzan (1999)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.6121
+  },
+  {
+    "movie_id": 2355,
+    "title": "Bug's Life, A (1998)",
+    "genres": [
+      "Animation",
+      "Children's",
+      "Comedy"
+    ],
+    "score": 0.60662
+  },
+  {
+    "movie_id": 2085,
+    "title": "101 Dalmatians (1961)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.60525
+  },
+  {
+    "movie_id": 596,
+    "title": "Pinocchio (1940)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.60525
+  },
+  {
+    "movie_id": 2090,
+    "title": "Rescuers, The (1977)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.59824
+  },
+  {
+    "movie_id": 2876,
+    "title": "Thumbelina (1994)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.59557
+  },
+  {
+    "movie_id": 2018,
+    "title": "Bambi (1942)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.59557
+  },
+  {
+    "movie_id": 2294,
+    "title": "Antz (1998)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.59557
+  },
+  {
+    "movie_id": 1907,
+    "title": "Mulan (1998)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.59557
+  },
+  {
+    "movie_id": 13,
+    "title": "Balto (1995)",
+    "genres": [
+      "Animation",
+      "Children's"
+    ],
+    "score": 0.59557
+  }
+]

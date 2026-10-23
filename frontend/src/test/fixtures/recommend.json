@@ -1,0 +1,63 @@
+{
+  "user_id": 1,
+  "cold_start": false,
+  "latency_ms": 9.221,
+  "cached": false,
+  "items": [
+    {
+      "movie_id": 364,
+      "title": "Lion King, The (1994)",
+      "genres": [
+        "Animation",
+        "Children's",
+        "Musical"
+      ],
+      "score": 0.99897
+    },
+    {
+      "movie_id": 2858,
+      "title": "American Beauty (1999)",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ],
+      "score": 0.9982
+    },
+    {
+      "movie_id": 2096,
+      "title": "Sleeping Beauty (1959)",
+      "genres": [
+        "Animation",
+        "Children's",
+        "Musical"
+      ],
+      "score": 0.99639
+    },
+    {
+      "movie_id": 34,
+      "title": "Babe (1995)",
+      "genres": [
+        "Children's",
+        "Comedy",
+        "Drama"
+      ],
+      "score": 0.99614
+    },
+    {
+      "movie_id": 318,
+      "title": "Shawshank Redemption, The (1994)",
+      "genres": [
+        "Drama"
+      ],
+      "score": 0.99536
+    },
+    {
+      "movie_id": 1225,
+      "title": "Amadeus (1984)",
+      "genres": [
+        "Drama"
+      ],
+      "score": 0.99459
+    }
+  ]
+}

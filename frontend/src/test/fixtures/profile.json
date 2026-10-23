@@ -1,0 +1,79 @@
+{
+  "user_id": 1,
+  "n_positive": 45,
+  "genre_mass": 0.8781138470253451,
+  "axes": [
+    {
+      "genre": "Action",
+      "value": 0.08085526899783385
+    },
+    {
+      "genre": "Adventure",
+      "value": 0.10108088969184778
+    },
+    {
+      "genre": "Animation",
+      "value": 0.4742013260224909
+    },
+    {
+      "genre": "Children's",
+      "value": 0.5006722476637774
+    },
+    {
+      "genre": "Comedy",
+      "value": 0.21035975682643832
+    },
+    {
+      "genre": "Crime",
+      "value": 0.05443130302866064
+    },
+    {
+      "genre": "Documentary",
+      "value": 0
+    },
+    {
+      "genre": "Drama",
+      "value": 0.3921103240501463
+    },
+    {
+      "genre": "Fantasy",
+      "value": 0.11428464060900358
+    },
+    {
+      "genre": "Film-Noir",
+      "value": 0
+    },
+    {
+      "genre": "Horror",
+      "value": 0
+    },
+    {
+      "genre": "Musical",
+      "value": 0.3907732639348623
+    },
+    {
+      "genre": "Mystery",
+      "value": 0
+    },
+    {
+      "genre": "Romance",
+      "value": 0.07317821039512361
+    },
+    {
+      "genre": "Sci-Fi",
+      "value": 0.07816782164398435
+    },
+    {
+      "genre": "Thriller",
+      "value": 0.05834746110883831
+    },
+    {
+      "genre": "War",
+      "value": 0.06496476636517956
+    },
+    {
+      "genre": "Western",
+      "value": 0
+    }
+  ]
+}
