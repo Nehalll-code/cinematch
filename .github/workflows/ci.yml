@@ -3,11 +3,25 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cinematch
+          POSTGRES_PASSWORD: cinematch_ci
+          POSTGRES_DB: cinematch_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cinematch -d cinematch_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      # Enables the Postgres variant of every DB test; without it they are reported as skipped.
+      CINEMATCH_TEST_DATABASE_URL: postgresql+psycopg://cinematch:cinematch_ci@127.0.0.1:5432/cinematch_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -r requirements.txt
       - run: python scripts/make_synthetic.py --users 200 --items 600 --interactions 12000 --out data_synthetic
-      - run: python -m pytest tests/ -q
+      - run: python -m pytest tests/ -q -rs
       - run: python experiments/run_eval.py --data data_synthetic --split temporal --k 10 --out artifacts_ci
