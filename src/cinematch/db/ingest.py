@@ -80,17 +80,51 @@ def _ingest_users(session: Session, ml_ids: list[int]) -> tuple[int, dict[int, i
 
 def _ingest_interactions(session: Session, ratings: pd.DataFrame, user_pk: dict[int, int]) -> int:
     before = session.scalar(select(func.count()).select_from(Interaction))
-    stmt = insert_for(session, Interaction).on_conflict_do_nothing(
-        index_elements=["user_id", "movie_id", "type"]
-    )
+    if session.get_bind().dialect.name == "postgresql":
+        _copy_interactions(session, ratings, user_pk)
+    else:
+        _executemany_interactions(session, ratings, user_pk)
+    return session.scalar(select(func.count()).select_from(Interaction)) - before
+
+
+def _rows(ratings: pd.DataFrame, user_pk: dict[int, int]):
+    for u, m, r, t in zip(ratings["userId"], ratings["movieId"], ratings["rating"], ratings["timestamp"]):
+        yield user_pk[int(u)], int(m), "rating", float(r), datetime.fromtimestamp(int(t), tz=timezone.utc)
+
+
+def _executemany_interactions(session: Session, ratings: pd.DataFrame, user_pk: dict[int, int]) -> None:
+    """Portable path (SQLite): batched INSERT .. ON CONFLICT DO NOTHING."""
+    stmt = insert_for(session, Interaction).on_conflict_do_nothing(index_elements=["user_id", "movie_id", "type"])
     for start in range(0, len(ratings), CHUNK):
         part = ratings.iloc[start : start + CHUNK]
-        rows = [
-            {
-                "user_id": user_pk[int(u)], "movie_id": int(m), "type": "rating", "rating": float(r),
-                "created_at": datetime.fromtimestamp(int(t), tz=timezone.utc),
-            }
-            for u, m, r, t in zip(part["userId"], part["movieId"], part["rating"], part["timestamp"])
-        ]
-        session.execute(stmt, rows)
-    return session.scalar(select(func.count()).select_from(Interaction)) - before
+        session.execute(stmt, [
+            {"user_id": u, "movie_id": m, "type": ty, "rating": r, "created_at": ts}
+            for u, m, ty, r, ts in _rows(part, user_pk)
+        ])
+
+
+def _copy_interactions(session: Session, ratings: pd.DataFrame, user_pk: dict[int, int]) -> None:
+    """PostgreSQL bulk path: COPY into a staging table, then one INSERT .. SELECT.
+
+    Why not just COPY into `interactions`: COPY streams rows through a single protocol command
+    with no per-statement parse/plan/round-trip cost (that is the whole speed-up over a
+    parameterised INSERT per chunk), but it has no ON CONFLICT, so a re-run would fail on the
+    first duplicate and the import would stop being idempotent. Staging keeps both: the stream is
+    COPY, the dedup is the final INSERT. `ORDER BY ord` makes the serial ids follow file order,
+    which leave-one-out among tied timestamps depends on (tests/test_db_source.py).
+    The staging table is TEMP and ON COMMIT DROP, and everything shares the caller's transaction.
+    """
+    conn = session.connection().connection.driver_connection  # the psycopg connection, same transaction
+    with conn.cursor() as cur:
+        cur.execute(
+            "CREATE TEMP TABLE _stage_interactions (ord bigint, user_id bigint, movie_id integer, "
+            "type text, rating double precision, created_at timestamptz) ON COMMIT DROP"
+        )
+        with cur.copy("COPY _stage_interactions (ord, user_id, movie_id, type, rating, created_at) FROM STDIN") as cp:
+            for i, row in enumerate(_rows(ratings, user_pk)):
+                cp.write_row((i, *row))
+        cur.execute(
+            "INSERT INTO interactions (user_id, movie_id, type, rating, created_at) "
+            "SELECT user_id, movie_id, type, rating, created_at FROM _stage_interactions ORDER BY ord "
+            "ON CONFLICT (user_id, movie_id, type) DO NOTHING"
+        )
