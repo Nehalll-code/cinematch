@@ -27,85 +27,188 @@ No network? `make synth` generates a dataset with the same schema, and everythin
 
 MovieLens **ml-1m** (1,000,209 ratings; 575,281 positives at rating ≥ 4.0), k=10, full-catalogue
 ranking over all **3,883 movies and 6,040 users** (the full catalogue, not just items that happen
-to have a positive rating; see "One index space" below). These numbers were produced by
-`python experiments/run_eval.py --source db` reading from PostgreSQL; `--source csv` gives
+to have a positive rating; see "One index space" below). `--source csv` and `--source db` give
 identical numbers, which a test enforces. `ml-latest-small` is kept as the fast smoke dataset
 (`make data-small && make smoke`) but is not used for headline numbers: its temporal split leaves
 only 26 evaluable users.
 
-iALS and item-kNN hyperparameters are untuned defaults. The one thing that *was* tuned is the
-hybrid's fusion weight, on a validation split carved out of train (next section).
+Every `tuned` row below was tuned on a validation split carved out of train (see "Tuning
+protocol"). The plain `item_knn` and `ials` rows are untuned defaults (item_knn k=200, shrink=10;
+iALS 64 factors, regularization 0.05, alpha 20), kept in the table on purpose: the comparison
+between them and the tuned rows is the first finding. Raw files: `results/ml1m_k10_tuned/`.
 
-**Global temporal split, 80/20 — 1,082 evaluable users** (the headline split; cut at 2000-12-01):
+**Global temporal split, 80/20 — 1,082 evaluable users** (cut at 2000-12-01):
 
 | model                | recall | precision |   ndcg |    map | coverage | diversity | novelty |
 |----------------------|-------:|----------:|-------:|-------:|---------:|----------:|--------:|
 | popularity           | 0.0446 |    0.1761 | 0.1892 | 0.1134 |   0.0234 |    0.7187 |    8.06 |
-| content              | 0.0070 |    0.0312 | 0.0319 | 0.0126 |   0.1257 |    0.3767 |   13.53 |
+| content              | 0.0076 |    0.0328 | 0.0333 | 0.0129 |   0.1452 |    0.3520 |   13.33 |
 | item_knn             | 0.0517 |    0.1936 | 0.2103 | 0.1278 |   0.0422 |    0.7507 |    8.37 |
+| item_knn (tuned)     | 0.0519 |    0.1917 | 0.2092 | 0.1268 |   0.0402 |    0.7397 |    8.29 |
 | ials                 | 0.0406 |    0.1368 | 0.1437 | 0.0743 |   0.2954 |    0.7050 |    9.68 |
-| hybrid (w=0.3)       | 0.0316 |    0.1101 | 0.1193 | 0.0588 |   0.2163 |    0.4960 |    9.87 |
-| hybrid (tuned, w=0)  | 0.0406 |    0.1368 | 0.1437 | 0.0743 |   0.2954 |    0.7050 |    9.68 |
+| **ials (tuned)**     | 0.0574 |    0.1994 | 0.2141 | 0.1281 |   0.0466 |    0.7440 |    8.28 |
+| hybrid (w=0.3)       | 0.0314 |    0.1072 | 0.1166 | 0.0568 |   0.2194 |    0.5017 |    9.90 |
+| hybrid (tuned, w=0)  | 0.0574 |    0.1994 | 0.2141 | 0.1281 |   0.0466 |    0.7440 |    8.28 |
 
-**Leave-one-out split — 6,028 evaluable users** (for comparability with published numbers):
+**Leave-one-out split — 6,028 evaluable users** (one relevant item per user):
 
-| model                 | recall | precision |   ndcg |    map | coverage | diversity | novelty |
-|-----------------------|-------:|----------:|-------:|-------:|---------:|----------:|--------:|
-| popularity            | 0.0405 |    0.0040 | 0.0193 | 0.0131 |   0.0296 |    0.7205 |    8.08 |
-| content               | 0.0196 |    0.0020 | 0.0093 | 0.0062 |   0.2161 |    0.3498 |   13.43 |
-| item_knn              | 0.0604 |    0.0060 | 0.0306 | 0.0217 |   0.0788 |    0.7367 |    8.42 |
-| ials                  | 0.0854 |    0.0085 | 0.0430 | 0.0303 |   0.3961 |    0.6662 |    9.63 |
-| hybrid (w=0.3)        | 0.0733 |    0.0073 | 0.0366 | 0.0256 |   0.3155 |    0.4656 |    9.87 |
-| hybrid (tuned, w=0.05)| 0.0818 |    0.0082 | 0.0405 | 0.0281 |   0.3680 |    0.5716 |    9.67 |
+| model                | recall | precision |   ndcg |    map | coverage | diversity | novelty |
+|----------------------|-------:|----------:|-------:|-------:|---------:|----------:|--------:|
+| popularity           | 0.0405 |    0.0040 | 0.0193 | 0.0131 |   0.0296 |    0.7205 |    8.08 |
+| content              | 0.0212 |    0.0021 | 0.0102 | 0.0068 |   0.2439 |    0.3319 |   13.27 |
+| item_knn             | 0.0604 |    0.0060 | 0.0306 | 0.0217 |   0.0788 |    0.7367 |    8.42 |
+| item_knn (tuned)     | 0.0634 |    0.0063 | 0.0315 | 0.0220 |   0.0850 |    0.7239 |    8.40 |
+| ials                 | 0.0854 |    0.0085 | 0.0430 | 0.0303 |   0.3961 |    0.6662 |    9.63 |
+| **ials (tuned)**     | 0.1017 |    0.0102 | 0.0509 | 0.0358 |   0.2071 |    0.6731 |    9.22 |
+| hybrid (w=0.3)       | 0.0768 |    0.0077 | 0.0387 | 0.0272 |   0.3217 |    0.4703 |    9.89 |
+| hybrid (tuned, w=0)  | 0.1017 |    0.0102 | 0.0509 | 0.0358 |   0.2071 |    0.6731 |    9.22 |
 
-`w` is the content model's weight in the rank-normalised blend `w·content + (1−w)·iALS`.
-"Tuned" rows use the weight chosen on validation (next section); at w = 0 the hybrid is
-identical to iALS.
+`w` is the content model's weight in the rank-normalised blend `w·content + (1−w)·iALS`; at
+w = 0 the hybrid is identical to iALS. **Absolute NDCG is not comparable across the two splits.**
+Under LOO every user has exactly one relevant item, so the ideal DCG is fixed at 1; under the
+temporal split users have anywhere from one to hundreds, and a list that hits some of many
+relevant items scores far higher. Compare models within a split, never numbers across splits.
 
-**Read these with three caveats.**
+### Finding 1: tuning changes the conclusion
 
-1. *The two splits disagree on ordering.* On temporal, NDCG ranks item_kNN > popularity > iALS >
-   hybrid > content: **popularity beats iALS**. On LOO it ranks iALS > item_kNN > hybrid >
-   popularity > content. Only content-last is consistent. LOO has 5.6× the users but leaks mildly
-   (see below), and temporal is the split that matches deployment, so neither is a clean answer.
-   A hypothesis for the temporal result, *not tested here*: item popularity persists across the
-   cut while untuned iALS fits per-user taste that drifts. Tuning iALS on a validation split
-   would be the way to find out.
-2. *Temporal evaluates a minority of users.* ml-1m covers 2000-04 to 2003-02 but most ratings
-   land in 2000. Only 1,785 of 6,040 users have any rating after the cutoff, and 1,082 of those
-   have ≥ 5 training interactions. The headline is a statement about users active late, not all
-   users.
-3. *Coverage is over the full 3,883-movie catalogue.* iALS reaches 40% under LOO while item_kNN
-   reaches 7.9%; that is a more honest denominator than "items that happen to appear in test".
+On the temporal split the default iALS **loses to popularity** (0.1437 vs 0.1892). Tuned, it
+**beats** popularity (0.2141). An untuned model is not evidence about a model family: reporting
+the default row alone would have concluded that matrix factorisation does not work on this data.
+The same tuning moves LOO NDCG from 0.0430 to 0.0509, and item-kNN barely at all (0.2103 → 0.2092
+temporal, 0.0306 → 0.0315 LOO; its default k=200 was already near a plateau).
+
+### Finding 2: the gain comes from becoming conservative
+
+Tuned iALS covers far less of the catalogue than the default:
+
+| split | default iALS coverage | tuned iALS coverage | tuned regularization |
+|---|---:|---:|---:|
+| temporal | 29.5% | **4.7%** | 100 |
+| LOO | 39.6% | **20.7%** | 30 |
+
+Validation NDCG rewarded heavier regularization on both splits, and the tuned temporal model
+(4.7%) now covers about as little as item-kNN (4.0%) and popularity (2.3%). **The tuned model wins
+on accuracy by becoming more popularity-shaped.** This is why coverage is reported alongside NDCG
+and not after it: the accuracy gain and the loss of catalogue reach are one trade, and a table of
+NDCG alone would hide it. The temporal split tunes harder in this direction than LOO does. Why it
+does is not established here; see "Why the two splits disagree" for what was and was not
+supported.
+
+### Finding 3: not every gap is real
+
+Paired bootstrap over test users (1000 resamples; the same user draw is applied to every model,
+so each interval is on the paired difference), 95% percentile intervals:
+
+| difference in NDCG@10 | temporal (1,082 users) | LOO (6,028 users) |
+|---|---|---|
+| tuned iALS − tuned item-kNN | +0.0049 [−0.0009, +0.0105] — **not distinguishable** | +0.0194 [+0.0158, +0.0231] — distinguishable |
+| tuned iALS − popularity | +0.0249 [+0.0174, +0.0332] — distinguishable | +0.0316 [+0.0271, +0.0364] — distinguishable |
+| tuned item-kNN − popularity | +0.0200 [+0.0124, +0.0281] — distinguishable | +0.0122 [+0.0092, +0.0152] — distinguishable |
+
+On the temporal split tuned iALS and tuned item-kNN are **comparable; no winner is declared**
+(0.2141 vs 0.2092 should not be read as one). On LOO tuned iALS is clearly ahead. Both beat
+popularity on both splits.
+
+These intervals cover **test-user sampling noise only**. They do not include variance from the
+iALS random initialisation (one seed was run) or from the choice of validation split, which on
+the temporal split is only 297 users. Reproduce with `experiments/bootstrap_ci.py`.
+
+### Tuning protocol
+
+- **Validation only.** The validation split is carved out of train with the same strategy as the
+  outer split (temporal: last 20% of train by time; LOO: each user's last training item).
+  `tune_model` and `tune_content_weight` take the training frame and nothing else of that kind,
+  so test data has no way in. Ties go to the first grid point.
+- **item-kNN grid:** `k` ∈ {50, 100, 200, 400, 800, 1600, 3883} × `shrink` ∈ {0, 10, 50, 200}.
+  The first grid stopped at k=400 and the optimum sat on that edge on both splits, so it was
+  extended; k=1600 is interior on both. Optima: temporal k=1600, shrink=50; LOO k=1600, shrink=10.
+- **iALS grid** (15 iterations fixed): stage 1 searched `factors` ∈ {32, 64, 128} ×
+  `regularization` ∈ {0.1, 1, 10} × `alpha` ∈ {0.25, 0.5, 1, 2, 5}. The optimum landed on the
+  regularization edge on both splits (and on the `factors` edge on temporal), so stage 2 added
+  `factors` ∈ {16, 32, 64, 128} × `regularization` ∈ {10, 30, 100, 300} × `alpha` ∈ {0.5, 1, 2},
+  reusing stage-1 trials rather than refitting. 84 distinct trials in total.
+  **The full alpha range was not searched at the optimum:** alpha spans {0.25, 0.5, 1, 2, 5}
+  overall, but only {0.5, 1, 2} at the tuned regularization. Alpha = 1 beat both neighbours there
+  on both splits; 0.25 and 5 were not tried at regularization 30–100.
+  Optima: temporal 128 factors / regularization 100 / alpha 1; LOO 128 / 30 / 1.
+- **Grid edges.** Regularization and alpha are interior at the optimum. `factors` is on the
+  upper edge (128) on both splits, so a validation-only probe fitted 256 factors at the
+  tuned regularization and alpha. Temporal: 256 scores 0.1930 against 0.1935 for 128, so the
+  optimum is interior. LOO: 256 scores 0.0531 against 0.0523 (and 0.0521 at 64), so the
+  best value moves to the new edge, but the gains (64→128: +0.0002; 128→256: +0.0008) are small
+  against a test-interval half-width of about 0.004 for the same number of users. **Over 64–256
+  factors the factor count is flat within noise on LOO and is not identified by this
+  procedure.** The one-standard-error rule (choose the simplest configuration within one standard
+  error of the best) would pick a smaller model than the argmax; on LOO that includes 64
+  factors. I kept 128, the argmax of the grid searched before the probe, and **64 would be
+  equally defensible**. The 256-factor model was not evaluated on test.
+- **How many times test was looked at.** Each `run_eval` run writes test metrics, and the stage-1
+  run did: I saw tuned iALS (0.1798) trailing popularity (0.1892) on temporal. Nothing was
+  *selected* on test: the stage-2 extension was triggered by validation edge optima, the
+  factor probe is validation-only, and no configuration was chosen after seeing its test score.
+  But the test split was viewed more than once, and the tables above are the final run.
+
+### Why the two splits disagree
+
+With tuned models the ordering is the same on both splits (iALS ≥ item-kNN > popularity), but the
+size of the gap is not: tuned iALS is 1.13× popularity on temporal and 2.6× on LOO.
+`experiments/analyze_splits.py` (tuned parameters read from the results JSON; nothing is chosen
+from it) breaks per-user NDCG down by history length and by held-out count. One hypothesis I
+started with was **refuted**, and the data supports a different account.
+
+*Refuted: "the temporal test set is dominated by users with short histories."* The opposite
+holds. Training-history length, in positives:
+
+| | <20 | 20–49 | 50–99 | 100–199 | 200+ | share with <50 |
+|---|---:|---:|---:|---:|---:|---:|
+| temporal (1,082 users) | 100 | 208 | 258 | 296 | 220 | 28% |
+| LOO (6,028 users) | 944 | 1,755 | 1,432 | 1,165 | 732 | 45% |
+
+Temporal test users are *warmer*. Their held-out items are not more concentrated either: 17.0% of
+temporal test interactions fall on the 100 most popular train films, against 20.2% for LOO.
+
+*Supported: the temporal metric is weighted toward users with many held-out films.* Users still
+active after the cutoff are heavy raters; 56% of temporal test users have 20 or more held-out
+positives (LOO: always one). Popularity is strong for them because any popular film is a likely hit:
+
+| held-out items per user | 1 | 2–4 | 5–19 | 20–49 | 50+ |
+|---|---:|---:|---:|---:|---:|
+| temporal users | 59 | 121 | 297 | 264 | 341 |
+| popularity NDCG | 0.0253 | 0.0202 | 0.0803 | 0.1615 | 0.3938 |
+| tuned iALS NDCG | 0.0688 | 0.0428 | 0.0933 | 0.1927 | 0.4217 |
+| iALS ÷ popularity | 2.7× | 2.1× | 1.16× | 1.19× | 1.07× |
+
+Matrix factorisation's edge is largest where a user has few relevant items to find, and shrinks to
+a few percent for heavy raters. The temporal test set is mostly heavy raters; LOO is entirely
+few-relevant-item users (iALS ÷ popularity there: 3.5× for users with under 20 training
+positives, 4.0× for 20–49, 1.5–1.65× for 50–199, 1.07× for 200+). So the splits answer different
+questions: LOO asks how well a model finds one more film for a typical user; temporal asks how
+well it fills a long list for the users who were still active late.
+
+*Not established:* why tuning pushes harder toward popularity-shaped output on temporal
+(regularization 100, coverage 4.7%) than on LOO (30, 20.7%). Candidates, none tested: taste drift
+across the cut rewards smoother, more popularity-like scores; the temporal validation split has
+only 297 users and is a noisy target; or the heavy-rater weighting above carries over into the
+validation split. The bucket figures come from one fit and carry no confidence intervals.
 
 ### Hybrid fusion weight
 
-The original hybrid blended content 0.3 / iALS 0.7. It scored *below iALS alone* on both
-splits, so the weight was tuned — on a validation split carved out of **train** (temporal: the
-last 20% of train by time; LOO: each user's last training interaction), never on test.
-`tune_content_weight` takes the train frame and nothing else of that kind, so test data has no
-way in. Validation NDCG@10 by content weight:
+The hybrid blends content and iALS with weight `w`. The weight was tuned on validation against the
+*tuned* iALS (so the partner is the strongest available model). Validation NDCG@10:
 
 | content weight | 0.0 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 |
 |---|---:|---:|---:|---:|---:|---:|
-| temporal (297 validation users) | **0.1288** | 0.1151 | 0.1131 | 0.1054 | 0.1018 | 0.0909 |
-| LOO (6,016 validation users) | 0.0433 | **0.0438** | 0.0431 | 0.0397 | 0.0376 | 0.0337 |
+| temporal (297 validation users) | **0.1935** | 0.1672 | 0.1526 | 0.1429 | 0.1348 | 0.1184 |
+| LOO (6,016 validation users) | **0.0523** | 0.0476 | 0.0456 | 0.0437 | 0.0413 | 0.0351 |
 
-The optimum is **at or next to zero on both splits**, and beyond 0.1 the curve falls steadily.
-That is the finding: **a genre-and-title content signal is too weak to contribute to the blend on
-this dataset.** Content alone scores NDCG 0.0319 (temporal) and 0.0093 (LOO) against iALS's
-0.1437 and 0.0430, and mixing a ranker that weak into a stronger one only dilutes it.
-
-Two things not to over-read. On LOO the validation winner is w = 0.05, but it beats w = 0 by
-0.0005 NDCG (about 1%), which is indistinguishable from noise; and on the held-out test split
-that 0.05 hybrid scored 0.0405, *below* iALS alone at 0.0430. The small validation gain did not
-generalise. The weight was not revisited after seeing test (that would be tuning on test).
-
-The hybrid is not deleted: it carries the cold-start popularity fallback and the content
-component that `/similar` reads. The served model uses w = 0 (`scripts/train.py
---content-weight`), my call: it is the optimum on the headline (temporal) validation split, and
-the LOO difference is within noise. Reproduce with `python experiments/run_eval.py --source db
---split temporal --tune-hybrid`.
+The optimum is exactly zero on both splits and the curve falls monotonically. A genre-and-title
+content signal is too weak to help a strong collaborative model on this dataset: mixing in a
+ranker that scores 0.0333 / 0.0102 NDCG against iALS's 0.2141 / 0.0509 only dilutes it. (Against
+the *default* iALS the LOO optimum was 0.05, ahead of 0 by 0.0005, which is within noise; it
+disappears once the partner is tuned.) The hybrid is kept because it carries the cold-start
+popularity fallback and the content component that `/similar` reads. The served model uses w = 0
+(`scripts/train.py --content-weight`). Reproduce the tuning with `python
+experiments/run_eval.py --split temporal --tune-models --tune-hybrid --ials-stages 2`.
 
 ### Why content-based underperforms here
 
@@ -114,31 +217,47 @@ The item representation is weak, and no fusion weight can fix that:
 - **Genres only, and few of them.** ml-1m has 18 genre labels forming 301 distinct combinations
   across 3,883 movies; 843 of them are plain "Drama". Most items are near-indistinguishable
   from many others.
-- **No plot text and no tag data.** Nothing describes what a film is *about* — tone, setting,
-  cast, director.
-- **The only extra text is the title, tokenised naively.** Title words ("the", "of", "love")
-  mostly add noise. The release year is dropped by the tokenizer's letters-only pattern (the code
-  comment in `content.py` says year is used; it is not).
+- **No plot text and no tag data.** Nothing describes what a film is *about*.
+- **The only extra text is the title.** Title words mostly add noise.
+- **The release year did not help meaningfully.** The tokenizer used to drop digits, so the year
+  (in the title, "Heat (1995)") was not a feature even though a code comment said it was. It now
+  admits digits, and a test checks every year is in the vocabulary. Content NDCG moved from 0.0332
+  to 0.0333 on temporal and from 0.0093 to 0.0102 on LOO. The temporal change is zero within
+  rounding; the LOO change is small, and **I did not test it against noise**, so it should not be
+  read as an effect.
 
-Fixing it needs richer item content, not a better blend: plot-synopsis or review embeddings
-(e.g. a sentence-transformer over TMDB/IMDb overviews), or the MovieLens **Tag Genome**
-(relevance scores for ~1,100 tags per film, shipped with ml-latest and ml-25m but not ml-1m).
-Neither is done here; the content model is reported as it is.
+Fixing it needs richer item content, not a better blend: plot-synopsis or review embeddings, or
+the MovieLens **Tag Genome** (shipped with ml-latest and ml-25m but not ml-1m). Neither is done
+here; the content model is reported as it is.
 
 ### Serving latency
 
 In-process, **not end-to-end over HTTP**: no network, no ASGI, no JSON serialisation. This is a
-lower bound on deployed latency. 3,883-movie catalogue, 6,040 users, k=10, 500 requests, one run
-on one machine, artifact trained from the database.
+**lower bound** on deployed latency. 3,883-movie catalogue, 6,040 users, k=10, 500 requests, one
+run on one machine.
 
-| path   | p50 | p95 | p99 |
-|--------|----:|----:|----:|
-| cold   | 2.998 ms | 4.583 ms | 5.610 ms |
-| cached | 0.001 ms | 0.001 ms | 0.003 ms |
+| path   | mean | p50 | p95 | p99 |
+|--------|----:|----:|----:|----:|
+| cold   | 3.30 ms | 3.10 ms | 4.59 ms | 5.68 ms |
+| cached | 0.001 ms | 0.001 ms | 0.001 ms | 0.001 ms |
 
-The "cached" row times the memoised top-k lookup only. The `/recommend` endpoint also calls
-`score_users` again to attach display scores, so a cache hit does not make a full request
-near-free. Fixing that is future work.
+A cold request scores the user once and returns the top-k with scores. The cache stores the
+`(item, score)` pairs themselves, so a hit is a dictionary lookup and never touches the model
+(a test asserts a hit makes zero model calls and returns identical scores). No speedup ratio is
+quoted: the cached figure is a lookup, so a ratio against it says nothing about the model.
+
+### New users: fold-in
+
+A registered user absent from training gets personalised recommendations from
+`GET /me/recommendations` without retraining. `IALSRecommender.fold_in` solves one least-squares
+problem for the user's latent vector against the **fixed** item factors; it is the user half-step
+of training (`_solve_row`), so it takes milliseconds and needs no scheduler or worker. The vector
+is cached per user and recomputed when the user's interactions change, keyed on
+`(interaction count, newest timestamp)`: the count alone is not enough, since re-rating an item
+leaves it unchanged while changing the user's liked set.
+
+**Future work: periodic full retraining.** Fold-in is online and cheap, but the item factors never
+learn from new users; only a full retrain does that.
 
 ## Persistence and accounts
 
@@ -224,9 +343,10 @@ and `PUT/DELETE/GET /watchlist`. The caller's identity comes only from the token
 stolen token is valid until it expires; rotating the secret logs everyone out); rate limiting
 and account lockout; email verification and password reset.
 
-These writes are **stored, not learned from**: nothing reaches the trained model and there is no
-scheduled retraining. A user registered after training has no row in the model, and
-`/recommend/{user_id}` still takes MovieLens ids.
+These writes are **stored, not learned from by training**: nothing reaches the trained factors and
+there is no scheduled retraining. A user registered after training has no row in the model, so
+`/recommend/{user_id}` (which takes MovieLens ids) does not apply to them; their personalised
+list comes from fold-in at `GET /me/recommendations` (see "New users: fold-in").
 
 ## Design decisions
 
@@ -262,10 +382,10 @@ popularity counts are integers. Min-max is outlier-dominated; rank normalisation
 The cost is that score margins are discarded — two near-tied items become adjacent ranks.
 
 **Coverage, diversity and novelty are reported alongside accuracy.** An accuracy-optimal model
-often serves the same few hundred items to everyone. In the LOO table above, `item_knn` reaches
-8.7% catalogue coverage against iALS's 43.3%: competitive NDCG, and a product that shows most
-users the same films.
-That trade-off is invisible if you only report Recall@10.
+often serves the same few hundred items to everyone. In the LOO table above, default `item_knn`
+reaches 7.9% catalogue coverage against default iALS's 39.6%, and tuning iALS for NDCG then
+cuts its coverage to 20.7% (4.7% on temporal): accuracy and reach trade against each other.
+That trade-off is invisible if you only report Recall@10 or NDCG.
 
 **Cold-start is a fallback, not a fudge.** Users below `cold_threshold` training interactions get
 popularity, because a profile built from one or two items is noise. Test users with fewer than
@@ -279,18 +399,19 @@ Claiming these would be dishonest, so they are listed as gaps:
 - **No Redis.** Recommendations are served from an artifact loaded into process memory and
   memoised in an in-process LRU. PostgreSQL holds accounts, interactions and the watchlist but is
   not consulted per recommendation.
-- **No online feedback loop.** Interactions can be written (`POST /interactions`) but are stored,
-  not learned from: no scheduled retraining, and users registered after training get no
-  personalised recommendations.
+- **No retraining loop.** Interactions can be written (`POST /interactions`) and a registered
+  user is personalised by fold-in against the fixed item factors, but the item factors themselves
+  are never updated: no scheduled or background retraining. Periodic full retraining is future
+  work; fold-in is online and cheap, but the item factors never learn from new users.
 - **No refresh tokens, revocation, secret rotation, rate limiting, email verification** (see
   "Accounts and auth").
 - **No LLM query interface.**
-- **No frontend.**
-- **No hyperparameter search beyond the fusion weight.** iALS factors/regularisation/α and
-  item-kNN's `k`/shrinkage are reasonable defaults, not tuned. The hybrid's content weight was
-  tuned on a validation split carved from train (see Results). Tuning anything on the test split
-  would invalidate the tables; extending the validation split to iALS is the next step, and the
-  temporal ordering (popularity ahead of iALS) is the reason to do it.
+- **No claim about the frontend's quality.** `frontend/` is a React + TypeScript + Vite control
+  panel over the API; it is not part of the evaluation.
+- **A narrow hyperparameter search.** iALS and item-kNN were grid-searched on validation only
+  (see "Tuning protocol"). `iterations` was fixed at 15, one random seed was run, the validation
+  split is small on the temporal side (297 users), and the LOO `factors` optimum is not identified
+  (flat within noise over 64–256).
 
 ## Layout
 
@@ -308,7 +429,9 @@ src/cinematch/
   recommenders/        popularity, content, item_knn, ials, hybrid
 migrations/            Alembic
 scripts/               download_data, make_synthetic, ingest, train
-experiments/           run_eval, benchmark_api
+experiments/           run_eval, benchmark_api, analyze_splits, bootstrap_ci, probe_factors
+results/               committed copies of the final tuned-run outputs cited in this README
+frontend/              React + TypeScript + Vite UI (separate from the evaluation)
 tests/                 oracle, leakage, DB equality, index-drift, auth and endpoint tests;
                        DB tests run on SQLite and on Postgres (make test-pg)
 ```

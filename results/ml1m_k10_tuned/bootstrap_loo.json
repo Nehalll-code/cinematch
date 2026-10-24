@@ -1,0 +1,66 @@
+{
+  "n_users": 6028,
+  "n_boot": 1000,
+  "seed": 0,
+  "models": {
+    "popularity": {
+      "mean": 0.019328387691750826,
+      "ci95": [
+        0.01670217735451462,
+        0.022122028404184865
+      ]
+    },
+    "item_knn_tuned": {
+      "mean": 0.031532866605359824,
+      "ci95": [
+        0.028386223228421388,
+        0.035043050049714114
+      ]
+    },
+    "ials_tuned": {
+      "mean": 0.05092752687330915,
+      "ci95": [
+        0.04679594645186026,
+        0.05531653280713784
+      ]
+    }
+  },
+  "differences": {
+    "ials_tuned - item_knn_tuned": {
+      "observed": 0.019394660267949324,
+      "ci95": [
+        0.015788659718936,
+        0.02309771257336958
+      ],
+      "distinguishable": true
+    },
+    "ials_tuned - popularity": {
+      "observed": 0.03159913918155832,
+      "ci95": [
+        0.02709906744229705,
+        0.03636990171732209
+      ],
+      "distinguishable": true
+    },
+    "item_knn_tuned - popularity": {
+      "observed": 0.012204478913608999,
+      "ci95": [
+        0.009207540033542934,
+        0.015180226852805548
+      ],
+      "distinguishable": true
+    }
+  },
+  "split": "loo",
+  "params": {
+    "ials_tuned": {
+      "factors": 128,
+      "regularization": 30.0,
+      "alpha": 1.0
+    },
+    "item_knn_tuned": {
+      "k": 1600,
+      "shrink": 10.0
+    }
+  }
+}

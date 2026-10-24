@@ -1,0 +1,29 @@
+575281 positive interactions | 6040 users | 3883 items
+split=loo: train=569244 test=6028 evaluable_users=6028
+tuned item_knn on validation (6016 users, 28 trials): {'k': 1600, 'shrink': 10.0} val_ndcg=0.0341 edge_of_grid=no
+tuned ials on validation (6016 users, 84 trials): {'factors': 128, 'regularization': 30.0, 'alpha': 1.0} val_ndcg=0.0523 edge_of_grid=['factors']
+tuned hybrid on validation (6016 users): content weight 0.0 (val ndcg 0.0523)
+    w=0.0   val_ndcg=0.0523 val_recall=0.1087
+    w=0.05  val_ndcg=0.0476 val_recall=0.0957
+    w=0.1   val_ndcg=0.0456 val_recall=0.0908
+    w=0.2   val_ndcg=0.0437 val_recall=0.0858
+    w=0.3   val_ndcg=0.0413 val_recall=0.0818
+    w=0.5   val_ndcg=0.0351 val_recall=0.0677
+  popularity  recall@10=0.0405  ndcg@10=0.0193  cov=0.030  fit=0.0s
+  content     recall@10=0.0212  ndcg@10=0.0102  cov=0.244  fit=0.3s
+  item_knn    recall@10=0.0604  ndcg@10=0.0306  cov=0.079  fit=1.9s
+  ials        recall@10=0.0854  ndcg@10=0.0430  cov=0.396  fit=54.5s
+  hybrid_0.3  recall@10=0.0768  ndcg@10=0.0387  cov=0.322  fit=0.1s
+  item_knn_tuned recall@10=0.0634  ndcg@10=0.0315  cov=0.085  fit=2.4s
+  ials_tuned  recall@10=0.1017  ndcg@10=0.0509  cov=0.207  fit=152.0s
+  hybrid_tuned_0 recall@10=0.1017  ndcg@10=0.0509  cov=0.207  fit=0.1s
+
+         model  recall  precision   ndcg    map  coverage  diversity  novelty  fit_seconds
+    popularity  0.0405     0.0040 0.0193 0.0131    0.0296     0.7205   8.0762       0.0500
+       content  0.0212     0.0021 0.0102 0.0068    0.2439     0.3319  13.2743       0.2800
+      item_knn  0.0604     0.0060 0.0306 0.0217    0.0788     0.7367   8.4208       1.9300
+          ials  0.0854     0.0085 0.0430 0.0303    0.3961     0.6662   9.6289      54.5200
+    hybrid_0.3  0.0768     0.0077 0.0387 0.0272    0.3217     0.4703   9.8945       0.1000
+item_knn_tuned  0.0634     0.0063 0.0315 0.0220    0.0850     0.7239   8.3985       2.3700
+    ials_tuned  0.1017     0.0102 0.0509 0.0358    0.2071     0.6731   9.2192     152.0200
+hybrid_tuned_0  0.1017     0.0102 0.0509 0.0358    0.2071     0.6731   9.2192       0.1000
