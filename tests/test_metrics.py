@@ -89,3 +89,16 @@ def test_metrics_are_in_valid_ranges(dataset, split):
     for value in (m.recall, m.precision, m.ndcg, m.map, m.coverage, m.diversity):
         assert 0.0 <= value <= 1.0
     assert m.novelty > 0.0
+
+
+def test_per_user_out_matches_the_reported_means(dataset, split):
+    train, test = split
+    model = RandomRecommender().fit(dataset, train)
+    per_user: dict = {}
+    m = evaluate(model, dataset, train, test, k=10, per_user_out=per_user)
+    assert len(per_user["user_idx"]) == m.users_evaluated
+    assert per_user["user_idx"].tolist() == sorted(test["user_idx"].unique().tolist())
+    assert per_user["ndcg"].mean() == pytest.approx(m.ndcg)
+    assert per_user["recall"].mean() == pytest.approx(m.recall)
+    assert per_user["map"].mean() == pytest.approx(m.map)
+    assert per_user["precision"].mean() == pytest.approx(m.precision)

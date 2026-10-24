@@ -69,7 +69,11 @@ def evaluate(
     k: int = 10,
     batch_size: int = 512,
     item_features: sp.csr_matrix | None = None,
+    per_user_out: dict | None = None,
 ) -> Metrics:
+    """Full-ranking metrics. If `per_user_out` is given it is filled with the per-user arrays the
+    means are taken over ({"user_idx", "recall", "precision", "ndcg", "map"}, aligned), so a caller
+    can bootstrap or stratify without refitting. Default None: no change in behaviour or cost."""
     truth = {int(u): g["item_idx"].to_numpy() for u, g in test.groupby("user_idx", sort=True)}
     users = np.array(sorted(truth.keys()), dtype=np.int64)
     if len(users) == 0:
@@ -116,6 +120,12 @@ def evaluate(
         novelties.append(self_info[top].mean(axis=1))
         diversities.append(_intra_list_diversity(top, item_features))
         recommended_items.update(top.ravel().tolist())
+
+    if per_user_out is not None:
+        per_user_out.update(
+            user_idx=users, recall=np.concatenate(recalls), precision=np.concatenate(precisions),
+            ndcg=np.concatenate(ndcgs), map=np.concatenate(aps),
+        )
 
     return Metrics(
         model=model.name,

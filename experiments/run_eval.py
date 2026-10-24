@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+import numpy as np
 import pandas as pd
 
 from cinematch.evaluate import evaluate, results_table
@@ -51,6 +52,9 @@ def main() -> None:
     ap.add_argument("--prior-tuning", default=None,
                     help="dir with results_<split>_k<k>.json from an earlier --tune-models run: its trials are "
                          "reused (not refit) and compete with the new ones")
+    ap.add_argument("--save-per-user", action="store_true",
+                    help="also write per_user_<split>_k<k>.npz: per-user recall/precision/NDCG/MAP for every "
+                         "model, so bootstraps and stratified breakdowns need no refit")
     args = ap.parse_args()
 
     ds = load_dataset(args.source, args.data)
@@ -124,12 +128,16 @@ def main() -> None:
         models.append(tuned)
 
     rows = []
+    per_user: dict = {}
     for model in models:
         t0 = time.perf_counter()
         model.fit(ds, train)
         fit_s = time.perf_counter() - t0
         t0 = time.perf_counter()
-        m = evaluate(model, ds, train, test, k=args.k)
+        pu: dict | None = {} if args.save_per_user else None
+        m = evaluate(model, ds, train, test, k=args.k, per_user_out=pu)
+        if pu is not None:
+            per_user[model.name] = pu
         eval_s = time.perf_counter() - t0
         row = m.as_row()
         row["fit_seconds"] = round(fit_s, 2)
@@ -142,6 +150,12 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / f"results_{args.split}_k{args.k}.csv", index=False)
+    if per_user:
+        arrays = {"user_idx": next(iter(per_user.values()))["user_idx"]}
+        for name, pu in per_user.items():
+            for metric in ("recall", "precision", "ndcg", "map"):
+                arrays[f"{name}/{metric}"] = pu[metric]
+        np.savez_compressed(out / f"per_user_{args.split}_k{args.k}.npz", **arrays)
     payload = {"rows": rows}
     if tuning:
         payload["tuning"] = tuning
