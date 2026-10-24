@@ -1,0 +1,146 @@
+{
+  "temporal": {
+    "users": 1082,
+    "mean_ndcg": {
+      "popularity": 0.18916633778004313,
+      "item_knn_tuned": 0.2091740578145071,
+      "ials_tuned": 0.21408107519371974
+    },
+    "test_share_on_top100_train_popular": 0.17033513991815064,
+    "test_share_on_items_seen_in_train": 0.9979537661763079,
+    "median_train_len": 92.5,
+    "median_relevant": 25.0,
+    "by_train_len": [
+      {
+        "bucket": "<20",
+        "users": 100,
+        "popularity": 0.28815856502679243,
+        "item_knn_tuned": 0.3261220480349305,
+        "ials_tuned": 0.3300905267840584
+      },
+      {
+        "bucket": "20-49",
+        "users": 208,
+        "popularity": 0.20762176252309075,
+        "item_knn_tuned": 0.22985453132999561,
+        "ials_tuned": 0.23660604793927648
+      },
+      {
+        "bucket": "50-99",
+        "users": 258,
+        "popularity": 0.18952384521970905,
+        "item_knn_tuned": 0.20754899719906553,
+        "ials_tuned": 0.2130050853710641
+      },
+      {
+        "bucket": "100-199",
+        "users": 296,
+        "popularity": 0.1706145007376176,
+        "item_knn_tuned": 0.1953204813287786,
+        "ials_tuned": 0.19106342916920302
+      },
+      {
+        "bucket": "200+",
+        "users": 220,
+        "popularity": 0.15126250038865802,
+        "item_knn_tuned": 0.15700854311130527,
+        "ials_tuned": 0.1722842075000488
+      }
+    ],
+    "by_n_relevant": [
+      {
+        "bucket": "1",
+        "users": 59,
+        "popularity": 0.025292929995224468,
+        "item_knn_tuned": 0.03094264750934876,
+        "ials_tuned": 0.06884078494313306
+      },
+      {
+        "bucket": "2-4",
+        "users": 121,
+        "popularity": 0.02016266317210006,
+        "item_knn_tuned": 0.040579205617018735,
+        "ials_tuned": 0.042756392959291234
+      },
+      {
+        "bucket": "5-19",
+        "users": 297,
+        "popularity": 0.08029226268699959,
+        "item_knn_tuned": 0.08611201239172334,
+        "ials_tuned": 0.09334874692497667
+      },
+      {
+        "bucket": "20-49",
+        "users": 264,
+        "popularity": 0.16145786708526275,
+        "item_knn_tuned": 0.1929453946006649,
+        "ials_tuned": 0.19274738459953494
+      },
+      {
+        "bucket": "50+",
+        "users": 341,
+        "popularity": 0.3937663737123638,
+        "item_knn_tuned": 0.41958292849756146,
+        "ials_tuned": 0.42167362501140865
+      }
+    ]
+  },
+  "loo": {
+    "users": 6028,
+    "mean_ndcg": {
+      "popularity": 0.019328387691750826,
+      "item_knn_tuned": 0.031532866605359824,
+      "ials_tuned": 0.05092752687330915
+    },
+    "test_share_on_top100_train_popular": 0.20189117451891175,
+    "test_share_on_items_seen_in_train": 0.9995023224950232,
+    "median_train_len": 57.0,
+    "median_relevant": 1.0,
+    "by_train_len": [
+      {
+        "bucket": "<20",
+        "users": 944,
+        "popularity": 0.03061537165124915,
+        "item_knn_tuned": 0.06224208771455969,
+        "ials_tuned": 0.10593415810374154
+      },
+      {
+        "bucket": "20-49",
+        "users": 1755,
+        "popularity": 0.01727851653506572,
+        "item_knn_tuned": 0.034736378983125135,
+        "ials_tuned": 0.06932627764907012
+      },
+      {
+        "bucket": "50-99",
+        "users": 1432,
+        "popularity": 0.02169994745306391,
+        "item_knn_tuned": 0.02733604124869114,
+        "ials_tuned": 0.03312968568372773
+      },
+      {
+        "bucket": "100-199",
+        "users": 1165,
+        "popularity": 0.014383883522222094,
+        "item_knn_tuned": 0.020391441340014416,
+        "ials_tuned": 0.023846749796721044
+      },
+      {
+        "bucket": "200+",
+        "users": 732,
+        "popularity": 0.012917028130981115,
+        "item_knn_tuned": 0.010191261953466622,
+        "ials_tuned": 0.013795759639315975
+      }
+    ],
+    "by_n_relevant": [
+      {
+        "bucket": "1",
+        "users": 6028,
+        "popularity": 0.019328387691750826,
+        "item_knn_tuned": 0.031532866605359824,
+        "ials_tuned": 0.05092752687330914
+      }
+    ]
+  }
+}

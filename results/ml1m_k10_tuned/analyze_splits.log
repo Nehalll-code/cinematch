@@ -1,0 +1,35 @@
+
+=== temporal: 1082 users, mean NDCG popularity=0.1892  item_knn_tuned=0.2092  ials_tuned=0.2141
+test interactions on the 100 most popular TRAIN films: 17.0%; on films that appear in train at all: 99.8%
+by training-history length (positives in train):
+           users  popularity  item_knn_tuned  ials_tuned
+train_len                                               
+<20          100      0.2882          0.3261      0.3301
+20-49        208      0.2076          0.2299      0.2366
+50-99        258      0.1895          0.2075      0.2130
+100-199      296      0.1706          0.1953      0.1911
+200+         220      0.1513          0.1570      0.1723
+by number of relevant (held-out) items:
+            users  popularity  item_knn_tuned  ials_tuned
+n_relevant                                               
+1              59      0.0253          0.0309      0.0688
+2-4           121      0.0202          0.0406      0.0428
+5-19          297      0.0803          0.0861      0.0933
+20-49         264      0.1615          0.1929      0.1927
+50+           341      0.3938          0.4196      0.4217
+
+=== loo: 6028 users, mean NDCG popularity=0.0193  item_knn_tuned=0.0315  ials_tuned=0.0509
+test interactions on the 100 most popular TRAIN films: 20.2%; on films that appear in train at all: 100.0%
+by training-history length (positives in train):
+           users  popularity  item_knn_tuned  ials_tuned
+train_len                                               
+<20          944      0.0306          0.0622      0.1059
+20-49       1755      0.0173          0.0347      0.0693
+50-99       1432      0.0217          0.0273      0.0331
+100-199     1165      0.0144          0.0204      0.0238
+200+         732      0.0129          0.0102      0.0138
+by number of relevant (held-out) items:
+            users  popularity  item_knn_tuned  ials_tuned
+n_relevant                                               
+1            6028      0.0193          0.0315      0.0509
+exit=0
