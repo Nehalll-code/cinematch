@@ -22,17 +22,22 @@ def main() -> None:
     ap.add_argument("--source", choices=SOURCES, default="csv")
     ap.add_argument("--data", default="data/ml-1m", help="csv source only")
     ap.add_argument("--out", default="artifacts/model.pkl")
+    # The iALS defaults are the untuned ones. `make train` passes the configuration tuned on the
+    # temporal validation split (factors 128, regularization 100, alpha 1.0); see README, "Tuning
+    # protocol" and "Serving". They were tuned on a model fit to the TRAIN period only, and are
+    # reused here on the full history, which is more data than they were tuned for.
     ap.add_argument("--factors", type=int, default=64)
-    # 0.0 is the optimum on the headline (temporal) validation split carved from train
-    # (run_eval.py --tune-hybrid); the LOO validation optimum is 0.05, within noise of 0. See README.
-    # The content model stays in the hybrid because /similar reads its item features, but at 0.0
-    # it contributes nothing to the blend.
+    ap.add_argument("--regularization", type=float, default=0.05)
+    ap.add_argument("--alpha", type=float, default=20.0)
+    # 0.0 is the optimum on both validation splits once the iALS partner is tuned (README, "Hybrid
+    # fusion weight"). The content model stays in the hybrid because /similar reads its item
+    # features, but at 0.0 it contributes nothing to the blend.
     ap.add_argument("--content-weight", type=float, default=0.0)
     args = ap.parse_args()
 
     ds = load_dataset(args.source, args.data)
     content = ContentRecommender()
-    ials = IALSRecommender(factors=args.factors, iterations=15)
+    ials = IALSRecommender(factors=args.factors, regularization=args.regularization, alpha=args.alpha, iterations=15)
     w = args.content_weight
     model = HybridRecommender({"content": (content, w), "ials": (ials, 1.0 - w)}, cold_threshold=3)
     # trained on the full history: the temporal holdout exists to estimate

@@ -15,8 +15,8 @@ synth:           ## generate offline synthetic data (no network)
 smoke:           ## quick end-to-end eval on the small dataset
 	python experiments/run_eval.py --data data/small --split loo --k 10 --out artifacts_smoke
 
-train:
-	python scripts/train.py --data data/ml-1m --out artifacts/model.pkl
+train:           ## served model: iALS tuned on the temporal validation split, content weight 0
+	python scripts/train.py --data data/ml-1m --out artifacts/model.pkl --factors 128 --regularization 100 --alpha 1.0 --content-weight 0.0
 
 eval:            ## headline numbers: global temporal split
 	python experiments/run_eval.py --data data/ml-1m --split temporal --k 10

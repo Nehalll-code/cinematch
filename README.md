@@ -233,18 +233,39 @@ here; the content model is reported as it is.
 ### Serving latency
 
 In-process, **not end-to-end over HTTP**: no network, no ASGI, no JSON serialisation. This is a
-**lower bound** on deployed latency. 3,883-movie catalogue, 6,040 users, k=10, 500 requests, one
-run on one machine.
+**lower bound** on deployed latency. 3,883-movie catalogue, 6,040 users, k=10, 500 requests, on
+the served artifact (128 factors, see "Serving") on one machine.
 
 | path   | mean | p50 | p95 | p99 |
 |--------|----:|----:|----:|----:|
-| cold   | 3.30 ms | 3.10 ms | 4.59 ms | 5.68 ms |
+| cold   | 3.08 ms | 3.00 ms | 4.10 ms | 5.06 ms |
 | cached | 0.001 ms | 0.001 ms | 0.001 ms | 0.001 ms |
+
+Cold p95 was 4.03 ms and 4.10 ms on two quiet runs; a third run, taken while the machine was
+busy, gave 7.85 ms, so treat the figure as about 4 ms with run-to-run noise. The earlier 64-factor
+artifact measured 4.6 ms p95, but that was a different model on a different day, so the two are not
+a controlled comparison of factor count.
 
 A cold request scores the user once and returns the top-k with scores. The cache stores the
 `(item, score)` pairs themselves, so a hit is a dictionary lookup and never touches the model
 (a test asserts a hit makes zero model calls and returns identical scores). No speedup ratio is
 quoted: the cached figure is a lookup, so a ratio against it says nothing about the model.
+
+### Serving: the accuracy-optimal model, and what that costs
+
+`make train` fits the served model on the full history with the configuration tuned on the
+**temporal** validation split: iALS with 128 factors, regularization 100, alpha 1.0, content
+weight 0. Temporal is the deployment-realistic protocol (train on the past, serve the future). Two
+caveats: those values were tuned on a model fitted to the train period only and are reused on more
+data, and the served artifact is a different fit from the evaluated one, so the README's tables
+describe the configuration, not this exact model.
+
+**This model is accuracy-optimal and shows about 4.7% of the catalogue** (the temporal coverage in
+Finding 2). A production system would likely trade some NDCG for exposure (a coverage or
+diversity term, re-ranking, or exploration), because a recommender that serves most users the
+same few hundred films under-exposes the rest of the catalogue. This repository serves the
+accuracy-optimal model on purpose: the evaluation is the deliverable, and tuned-for-NDCG with
+coverage reported next to it is the result being shown. No coverage-aware variant is built.
 
 ### New users: fold-in
 
